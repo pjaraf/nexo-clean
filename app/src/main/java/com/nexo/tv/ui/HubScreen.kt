@@ -60,7 +60,6 @@ import com.nexo.tv.data.XtreamClient
 
 private val Orange = Color(0xFFDE5B17)
 private val Bg = Color(0xFF0D0D0D)
-private val Side = Color(0xFF141414)
 
 private enum class Tab { HOME, TV, SERIES, MOVIES }
 
@@ -71,17 +70,56 @@ fun HubScreen(onLogout: () -> Unit) {
     val movies = Catalog.movies
     val series = Catalog.series
 
-    Row(Modifier.fillMaxSize().background(Bg)) {
+    Box(Modifier.fillMaxSize().background(Bg)) {
+        // Contenido a pantalla completa (sin panel lateral)
+        Box(Modifier.fillMaxSize()) {
+            when (tab) {
+                Tab.HOME -> HomePane(
+                    movies = movies.take(30),
+                    onMovie = { item ->
+                        ctx.startActivity(
+                            Intent(ctx, VodActivity::class.java)
+                                .putExtra(VodActivity.EXTRA_URL, XtreamClient.movieUrl(item.id, item.ext ?: "mp4"))
+                                .putExtra(VodActivity.EXTRA_TITLE, item.name)
+                        )
+                    }
+                )
+                Tab.SERIES -> Box(Modifier.padding(start = 88.dp, top = 24.dp, end = 24.dp, bottom = 24.dp).fillMaxSize()) {
+                    PosterGrid(items = series.map { it.id to (it.cover to it.name) })
+                }
+                Tab.MOVIES -> Box(Modifier.padding(start = 88.dp, top = 24.dp, end = 24.dp, bottom = 24.dp).fillMaxSize()) {
+                    PosterGrid(
+                        items = movies.map { it.id to (it.streamIcon to it.name) },
+                        onClick = { id ->
+                            val item = movies.find { it.id == id } ?: return@PosterGrid
+                            ctx.startActivity(
+                                Intent(ctx, VodActivity::class.java)
+                                    .putExtra(VodActivity.EXTRA_URL, XtreamClient.movieUrl(item.id, item.ext ?: "mp4"))
+                                    .putExtra(VodActivity.EXTRA_TITLE, item.name)
+                            )
+                        }
+                    )
+                }
+                Tab.TV -> {}
+            }
+        }
+
+        // Botones flotantes a la izquierda (sin fondo de barra)
         Column(
             Modifier
-                .width(100.dp)
-                .fillMaxHeight()
-                .background(Side)
-                .padding(vertical = 24.dp),
+                .align(Alignment.CenterStart)
+                .padding(start = 14.dp, top = 20.dp, bottom = 20.dp)
+                .fillMaxHeight(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("N", color = Orange, fontSize = 28.sp, fontWeight = FontWeight.Black)
+            Text(
+                "N",
+                color = Orange,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
             NavIcon(Icons.Filled.Home, tab == Tab.HOME) { tab = Tab.HOME }
             NavIcon(Icons.Filled.LiveTv, tab == Tab.TV) {
                 ctx.startActivity(
@@ -99,37 +137,6 @@ fun HubScreen(onLogout: () -> Unit) {
                 onLogout()
             }
         }
-        Box(Modifier.fillMaxSize()) {
-            when (tab) {
-                Tab.HOME -> HomePane(
-                    movies = movies.take(30),
-                    onMovie = { item ->
-                        ctx.startActivity(
-                            Intent(ctx, VodActivity::class.java)
-                                .putExtra(VodActivity.EXTRA_URL, XtreamClient.movieUrl(item.id, item.ext ?: "mp4"))
-                                .putExtra(VodActivity.EXTRA_TITLE, item.name)
-                        )
-                    }
-                )
-                Tab.SERIES -> Box(Modifier.padding(24.dp).fillMaxSize()) {
-                    PosterGrid(items = series.map { it.id to (it.cover to it.name) })
-                }
-                Tab.MOVIES -> Box(Modifier.padding(24.dp).fillMaxSize()) {
-                    PosterGrid(
-                        items = movies.map { it.id to (it.streamIcon to it.name) },
-                        onClick = { id ->
-                            val item = movies.find { it.id == id } ?: return@PosterGrid
-                            ctx.startActivity(
-                                Intent(ctx, VodActivity::class.java)
-                                    .putExtra(VodActivity.EXTRA_URL, XtreamClient.movieUrl(item.id, item.ext ?: "mp4"))
-                                    .putExtra(VodActivity.EXTRA_TITLE, item.name)
-                            )
-                        }
-                    )
-                }
-                Tab.TV -> {}
-            }
-        }
     }
 }
 
@@ -138,9 +145,14 @@ private fun NavIcon(icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(52.dp)
-            .tvFocus(shape = RoundedCornerShape(14.dp), focusedScale = 1.06f)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) Orange.copy(alpha = 0.22f) else Color.Transparent)
+            .tvFocus(shape = RoundedCornerShape(50), focusedScale = 1.08f)
+            .clip(RoundedCornerShape(50))
+            .background(
+                when {
+                    selected -> Orange.copy(alpha = 0.92f)
+                    else -> Color.Black.copy(alpha = 0.28f)
+                }
+            )
             .clickable(onClick = onClick)
             .focusable(),
         contentAlignment = Alignment.Center
@@ -148,8 +160,8 @@ private fun NavIcon(icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = if (selected) Orange else Color.White,
-            modifier = Modifier.size(30.dp)
+            tint = Color.White,
+            modifier = Modifier.size(28.dp)
         )
     }
 }
@@ -206,7 +218,7 @@ private fun HomePane(
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(start = 28.dp, end = 20.dp, top = 26.dp, bottom = 14.dp)
+                .padding(start = 88.dp, end = 20.dp, top = 26.dp, bottom = 14.dp)
         ) {
             Text("NEXO", color = Orange, fontSize = 32.sp, fontWeight = FontWeight.Black)
 
