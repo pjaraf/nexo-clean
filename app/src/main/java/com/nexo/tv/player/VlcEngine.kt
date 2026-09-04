@@ -39,11 +39,11 @@ class VlcEngine(context: Context) {
         player.setEventListener { ev ->
             when (ev.type) {
                 MediaPlayer.Event.Playing -> main.post {
-                    applyForce169()
+                    applyAspectMode()
                     onBuffering?.invoke(false)
                     onPlaying?.invoke()
                 }
-                MediaPlayer.Event.Vout -> main.post { applyForce169() }
+                MediaPlayer.Event.Vout -> main.post { applyAspectMode() }
                 MediaPlayer.Event.Buffering -> {
                     val pct = ev.buffering
                     main.post { onBuffering?.invoke(pct < 92f) }
@@ -61,30 +61,183 @@ class VlcEngine(context: Context) {
         } catch (_: Throwable) {}
         layout = view
         player.attachViews(view, null, false, false)
-        applyForce169()
+        applyAspectMode()
     }
 
-    private fun applyForce169() {
+    /** @deprecated use applyAspectMode */
+    private fun applyForce169() = applyAspectMode()
+
+    fun playNow(url: String) = schedule(url, 0L, vod = false)
+
+    fun playVod(url: String) = schedule(url, 0L, vod = true)
+
+    fun playZap(url: String) = schedule(url, ZAP_DEBOUNCE_MS, vod = false)
+
+    fun togglePause() {
         if (released) return
         try {
-            player.videoScale = MediaPlayer.ScaleType.SURFACE_FILL
-        } catch (_: Throwable) {
-            try {
-                player.setAspectRatio("16:9")
-                player.setScale(0f)
-            } catch (_: Throwable) {}
-        }
-        try {
-            player.setAspectRatio("16:9")
-            player.setScale(0f)
+            if (player.isPlaying) player.pause() else player.play()
         } catch (_: Throwable) {}
     }
 
-    fun playNow(url: String) = schedule(url, 0L)
+    fun pause() {
+        if (released) return
+        try { player.pause() } catch (_: Throwable) {}
+    }
 
-    fun playZap(url: String) = schedule(url, ZAP_DEBOUNCE_MS)
+    fun resume() {
+        if (released) return
+        try { player.play() } catch (_: Throwable) {}
+    }
 
-    private fun schedule(url: String, debounceMs: Long) {
+    val isPlaying: Boolean
+        get() = try { !released && player.isPlaying } catch (_: Throwable) { false }
+
+    /** Posición actual en ms */
+    fun timeMs(): Long = try {
+        if (released) 0L else player.time.coerceAtLeast(0L)
+    } catch (_: Throwable) {
+        0L
+    }
+
+    /** Duración en ms */
+    fun lengthMs(): Long = try {
+        if (released) 0L else player.length.coerceAtLeast(0L)
+    } catch (_: Throwable) {
+        0L
+    }
+
+    fun seekBy(deltaMs: Long) {
+        if (released) return
+        try {
+            val len = player.length
+            val cur = player.time.coerceAtLeast(0L)
+            val target = (cur + deltaMs).coerceIn(0L, if (len > 0) len else cur + deltaMs)
+            player.time = target
+        } catch (_: Throwable) {}
+    }
+
+    fun seekTo(positionMs: Long) {
+        if (released) return
+        try {
+            val len = player.length
+            player.time = if (len > 0) positionMs.coerceIn(0L, len) else positionMs.coerceAtLeast(0L)
+        } catch (_: Throwable) {}
+    }
+
+    data class Track(val id: Int, val name: String)
+
+    fun audioTracks(): List<Track> {
+        if (released) return emptyList()
+        return try {
+            val tracks = player.audioTracks ?: return emptyList()
+            tracks.mapNotNull { t ->
+                val id = t.id
+                if (id < 0) null else Track(id, t.name?.ifBlank { "Audio $id" } ?: "Audio $id")
+            }
+        } catch (_: Throwable) {
+            emptyList()
+        }
+    }
+
+    fun currentAudioTrackId(): Int = try {
+        if (released) -1 else player.audioTrack
+    } catch (_: Throwable) {
+        -1
+    }
+
+    fun setAudioTrack(id: Int) {
+        if (released) return
+        try { player.audioTrack = id } catch (_: Throwable) {}
+    }
+
+    fun cycleAudioTrack(): String? {
+        val tracks = audioTracks()
+        if (tracks.isEmpty()) return null
+        val cur = currentAudioTrackId()
+        val idx = tracks.indexOfFirst { it.id == cur }.let { if (it < 0) 0 else (it + 1) % tracks.size }
+        setAudioTrack(tracks[idx].id)
+        return tracks[idx].name
+    }
+
+    fun subtitleTracks(): List<Track> {
+        if (released) return emptyList()
+        return try {
+            val tracks = player.spuTracks ?: return emptyList()
+            buildList {
+                add(Track(-1, "Sin subtítulos"))
+                tracks.forEach { t ->
+                    val id = t.id
+                    if (id >= 0) add(Track(id, t.name?.ifBlank { "Sub $id" } ?: "Sub $id"))
+                }
+            }
+        } catch (_: Throwable) {
+            emptyList()
+        }
+    }
+
+    fun currentSubtitleTrackId(): Int = try {
+        if (released) -1 else player.spuTrack
+    } catch (_: Throwable) {
+        -1
+    }
+
+    fun setSubtitleTrack(id: Int) {
+        if (released) return
+        try { player.spuTrack = id } catch (_: Throwable) {}
+    }
+
+    fun cycleSubtitleTrack(): String? {
+        val tracks = subtitleTracks()
+        if (tracks.isEmpty()) return "Sin subtítulos"
+        val cur = currentSubtitleTrackId()
+        val idx = tracks.indexOfFirst { it.id == cur }.let { if (it < 0) 0 else (it + 1) % tracks.size }
+        setSubtitleTrack(tracks[idx].id)
+        return tracks[idx].name
+    }
+
+    enum class AspectMode { FILL, FIT_16_9, BEST_FIT }
+
+    private var aspectMode = AspectMode.FILL
+
+    fun cycleAspectMode(): String {
+        aspectMode = when (aspectMode) {
+            AspectMode.FILL -> AspectMode.FIT_16_9
+            AspectMode.FIT_16_9 -> AspectMode.BEST_FIT
+            AspectMode.BEST_FIT -> AspectMode.FILL
+        }
+        applyAspectMode()
+        return when (aspectMode) {
+            AspectMode.FILL -> "Pantalla completa"
+            AspectMode.FIT_16_9 -> "16:9"
+            AspectMode.BEST_FIT -> "Original"
+        }
+    }
+
+    private fun applyAspectMode() {
+        if (released) return
+        try {
+            when (aspectMode) {
+                AspectMode.FILL -> {
+                    try { player.videoScale = MediaPlayer.ScaleType.SURFACE_FILL } catch (_: Throwable) {}
+                    player.setAspectRatio("16:9")
+                    player.setScale(0f)
+                }
+                AspectMode.FIT_16_9 -> {
+                    try { player.videoScale = MediaPlayer.ScaleType.SURFACE_16_9 } catch (_: Throwable) {}
+                    player.setAspectRatio("16:9")
+                    player.setScale(0f)
+                }
+                AspectMode.BEST_FIT -> {
+                    try { player.videoScale = MediaPlayer.ScaleType.SURFACE_BEST_FIT } catch (_: Throwable) {}
+                    player.setAspectRatio(null)
+                    player.setScale(0f)
+                }
+            }
+        } catch (_: Throwable) {}
+    }
+
+    private fun schedule(url: String, debounceMs: Long, vod: Boolean) {
         if (released || url.isBlank()) return
         if (url == lastUrl && isPlayingSafe()) return
         lastUrl = url
@@ -93,7 +246,7 @@ class VlcEngine(context: Context) {
         openRunnable?.let { main.removeCallbacks(it) }
         val r = Runnable {
             if (released || myGen != gen) return@Runnable
-            prepareSwitch(url, myGen)
+            prepareSwitch(url, myGen, vod)
         }
         pending = r
         if (debounceMs > 0L) main.postDelayed(r, debounceMs) else main.post(r)
@@ -105,11 +258,10 @@ class VlcEngine(context: Context) {
         false
     }
 
-    private fun prepareSwitch(url: String, myGen: Int) {
+    private fun prepareSwitch(url: String, myGen: Int, vod: Boolean) {
         val now = SystemClock.uptimeMillis()
         val gap = now - lastOpenAt
-        // Soft: sin stop si el último cambio no fue hace milisegundos (más rápido)
-        val useSoft = gap >= SOFT_MIN_GAP_MS
+        val useSoft = !vod && gap >= SOFT_MIN_GAP_MS
         if (!useSoft) {
             try {
                 if (player.isPlaying) player.stop()
@@ -117,32 +269,35 @@ class VlcEngine(context: Context) {
         }
         val open = Runnable {
             if (released || myGen != gen) return@Runnable
-            openMedia(url)
+            openMedia(url, vod)
         }
         openRunnable = open
-        if (useSoft) main.post(open) else main.postDelayed(open, STOP_SETTLE_MS)
+        if (useSoft) main.post(open) else main.postDelayed(open, if (vod) 0L else STOP_SETTLE_MS)
     }
 
-    private fun openMedia(url: String) {
+    private fun openMedia(url: String, vod: Boolean) {
         if (released) return
         lastOpenAt = SystemClock.uptimeMillis()
+        val cache = if (vod) VOD_CACHE_MS else LIVE_CACHE_MS
         try {
             val media = Media(lib, Uri.parse(url)).apply {
                 try { setHWDecoderEnabled(true, false) } catch (_: Throwable) {}
-                addOption(":network-caching=$LIVE_CACHE_MS")
-                addOption(":live-caching=$LIVE_CACHE_MS")
-                addOption(":file-caching=$LIVE_CACHE_MS")
-                addOption(":sout-mux-caching=$LIVE_CACHE_MS")
-                addOption(":clock-jitter=0")
-                addOption(":clock-synchro=0")
+                addOption(":network-caching=$cache")
+                addOption(":file-caching=$cache")
+                addOption(":sout-mux-caching=$cache")
+                if (!vod) {
+                    addOption(":live-caching=$cache")
+                    addOption(":clock-jitter=0")
+                    addOption(":clock-synchro=0")
+                }
                 addOption(":http-reconnect")
                 addOption(":no-audio-time-stretch")
             }
             player.media = media
             media.release()
-            applyForce169()
+            applyAspectMode()
             player.play()
-            main.post { applyForce169() }
+            main.post { applyAspectMode() }
         } catch (e: Throwable) {
             Log.e(TAG, "play failed $url", e)
             onError?.invoke()
@@ -167,6 +322,7 @@ class VlcEngine(context: Context) {
         private const val STOP_SETTLE_MS = 20L
         private const val SOFT_MIN_GAP_MS = 350L
         private const val LIVE_CACHE_MS = 50
+        private const val VOD_CACHE_MS = 1000
 
         private fun createLib(ctx: Context): LibVLC {
             val tries = listOf(
