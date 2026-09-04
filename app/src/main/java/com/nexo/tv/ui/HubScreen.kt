@@ -31,7 +31,6 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -64,7 +63,6 @@ import com.nexo.tv.MovieActivity
 import com.nexo.tv.SeriesActivity
 import com.nexo.tv.Session
 import com.nexo.tv.data.Catalog
-import com.nexo.tv.data.ContinueWatching
 import com.nexo.tv.data.SeriesItem
 import com.nexo.tv.data.VodItem
 import kotlinx.coroutines.delay
@@ -80,21 +78,10 @@ fun HubScreen(onLogout: () -> Unit) {
     val ctx = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var tab by remember { mutableStateOf(Tab.HOME) }
-    var continueItems by remember { mutableStateOf(ContinueWatching.list(ctx)) }
     val movies = Catalog.movies
     val series = Catalog.series
     val movies2026 = remember(movies) { movies.filter { it.matchesYear(2026) } }
     val liveFocus = remember { FocusRequester() }
-
-    DisposableEffect(lifecycleOwner) {
-        val obs = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                continueItems = ContinueWatching.list(ctx)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(obs)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
-    }
 
     // Foco por defecto en TV en vivo (OK abre canales).
     var hubResumeTick by remember { mutableStateOf(0) }
@@ -148,47 +135,6 @@ fun HubScreen(onLogout: () -> Unit) {
         }
     }
 
-    fun openContinue(item: ContinueWatching.Item) {
-        when (item.kind) {
-            "movie" -> {
-                val fromCatalog = movies.find { it.id == item.id }
-                AppExit.openChildActivity {
-                    ctx.startActivity(
-                        Intent(ctx, MovieActivity::class.java)
-                            .putExtra(MovieActivity.EXTRA_MOVIE_ID, item.id)
-                            .putExtra(MovieActivity.EXTRA_MOVIE_NAME, item.title)
-                            .putExtra(MovieActivity.EXTRA_MOVIE_COVER, item.poster.orEmpty())
-                            .putExtra(
-                                MovieActivity.EXTRA_CATEGORY_ID,
-                                item.categoryId ?: fromCatalog?.categoryId.orEmpty()
-                            )
-                            .putExtra(MovieActivity.EXTRA_EXT, fromCatalog?.ext ?: "mp4")
-                            .putExtra(MovieActivity.EXTRA_RESUME_MS, item.positionMs)
-                            .putExtra(MovieActivity.EXTRA_USER, Session.username)
-                            .putExtra(MovieActivity.EXTRA_PASS, Session.password)
-                            .putExtra(MovieActivity.EXTRA_SERVER, Session.server)
-                    )
-                }
-            }
-            "series" -> {
-                AppExit.openChildActivity {
-                    ctx.startActivity(
-                        Intent(ctx, SeriesActivity::class.java)
-                            .putExtra(SeriesActivity.EXTRA_SERIES_ID, item.id)
-                            .putExtra(SeriesActivity.EXTRA_SERIES_NAME, item.title)
-                            .putExtra(SeriesActivity.EXTRA_SERIES_COVER, item.poster.orEmpty())
-                            .putExtra(SeriesActivity.EXTRA_CATEGORY_ID, item.categoryId.orEmpty())
-                            .putExtra(SeriesActivity.EXTRA_RESUME_EPISODE_ID, item.episodeId.orEmpty())
-                            .putExtra(SeriesActivity.EXTRA_RESUME_MS, item.positionMs)
-                            .putExtra(SeriesActivity.EXTRA_USER, Session.username)
-                            .putExtra(SeriesActivity.EXTRA_PASS, Session.password)
-                            .putExtra(SeriesActivity.EXTRA_SERVER, Session.server)
-                    )
-                }
-            }
-        }
-    }
-
     fun openLive() {
         AppExit.openChildActivity {
             ctx.startActivity(
@@ -207,9 +153,7 @@ fun HubScreen(onLogout: () -> Unit) {
             when (tab) {
                 Tab.HOME -> HomePane(
                     movies = movies2026,
-                    continueItems = continueItems,
-                    onMovie = { openMovie(it) },
-                    onContinue = { openContinue(it) }
+                    onMovie = { openMovie(it) }
                 )
                 Tab.SERIES -> Box(
                     Modifier
@@ -328,9 +272,7 @@ private fun NavIcon(
 @Composable
 private fun HomePane(
     movies: List<VodItem>,
-    continueItems: List<ContinueWatching.Item>,
-    onMovie: (VodItem) -> Unit,
-    onContinue: (ContinueWatching.Item) -> Unit
+    onMovie: (VodItem) -> Unit
 ) {
     var featured by remember(movies) { mutableStateOf(movies.firstOrNull()) }
 
@@ -384,20 +326,6 @@ private fun HomePane(
             }
         }
 
-        if (continueItems.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            Text("Seguir viendo", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(8.dp))
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                items(continueItems, key = { "${it.kind}:${it.id}" }) { item ->
-                    ContinuePoster(item = item, onClick = { onContinue(item) })
-                }
-            }
-        }
-
         Spacer(Modifier.weight(1f))
         Text("Películas 2026", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
@@ -426,54 +354,6 @@ private fun HomePane(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun ContinuePoster(item: ContinueWatching.Item, onClick: () -> Unit) {
-    Column(
-        Modifier
-            .width(PosterW)
-            .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
-            .clickable(onClick = onClick)
-            .focusable()
-    ) {
-        Box {
-            AsyncImage(
-                model = item.poster,
-                contentDescription = item.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .width(PosterW)
-                    .height(PosterH)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF222222))
-            )
-            LinearProgressIndicator(
-                progress = { item.progress },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)),
-                color = Orange,
-                trackColor = Color.White.copy(alpha = 0.25f)
-            )
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            item.title,
-            color = Color.White,
-            fontSize = 12.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            item.subtitle,
-            color = Color.White.copy(alpha = 0.65f),
-            fontSize = 11.sp,
-            maxLines = 1
-        )
     }
 }
 
