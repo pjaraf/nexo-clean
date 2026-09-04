@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -369,7 +370,7 @@ private fun PosterGrid(
     items: List<Pair<String, Pair<String?, String>>>,
     onClick: (String) -> Unit = {}
 ) {
-    val cols = 6
+    val cols = 7
     val rowsPerPage = 3
     val pageSize = cols * rowsPerPage
     val pages = remember(items) { items.chunked(pageSize) }
@@ -421,9 +422,9 @@ private fun PosterPage(
     onFocusPage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val hGap = 8.dp
-    val vGap = 8.dp
-    val pad = 6.dp
+    val hGap = 6.dp
+    val vGap = 6.dp
+    val pad = 4.dp
     val rowItems = remember(items, cols) { items.chunked(cols) }
 
     Column(
@@ -436,7 +437,8 @@ private fun PosterPage(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(hGap)
+                horizontalArrangement = Arrangement.spacedBy(hGap),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 repeat(cols) { colIndex ->
                     val item = row.getOrNull(colIndex)
@@ -451,8 +453,9 @@ private fun PosterPage(
                                 url = item.second.first,
                                 title = item.second.second,
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.03f)
+                                    .fillMaxHeight()
+                                    .aspectRatio(2f / 3f)
+                                    .tvFocus(shape = RoundedCornerShape(8.dp), focusedScale = 1.03f)
                                     .onFocusChanged { if (it.isFocused) onFocusPage() }
                                     .clickable { onClick(item.first) }
                                     .focusable()
@@ -470,9 +473,7 @@ private fun Poster(url: String?, title: String, modifier: Modifier = Modifier) {
     AsyncImage(
         model = url,
         contentDescription = title,
-        contentScale = ContentScale.Fit,
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF222222))
+        contentScale = ContentScale.Crop,
+        modifier = modifier.clip(RoundedCornerShape(8.dp))
     )
 }
