@@ -83,7 +83,7 @@ fun HubScreen(onLogout: () -> Unit) {
                         ctx.startActivity(
                             Intent(ctx, VodActivity::class.java)
                                 .putExtra(VodActivity.EXTRA_URL, XtreamClient.movieUrl(item.id, item.ext ?: "mp4"))
-                                .putExtra(VodActivity.EXTRA_TITLE, item.name)
+                                .putExtra(VodActivity.EXTRA_TITLE, item.displayName)
                         )
                     }
                 )
@@ -114,7 +114,7 @@ fun HubScreen(onLogout: () -> Unit) {
                                 ctx.startActivity(
                                     Intent(ctx, VodActivity::class.java)
                                         .putExtra(VodActivity.EXTRA_URL, XtreamClient.movieUrl(item.id, item.ext ?: "mp4"))
-                                        .putExtra(VodActivity.EXTRA_TITLE, item.name)
+                                        .putExtra(VodActivity.EXTRA_TITLE, item.displayName)
                                 )
                             }
                         )
@@ -207,7 +207,7 @@ private fun HomePane(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = movie.name,
+                        text = movie.displayName,
                         color = Color.White,
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
@@ -234,7 +234,7 @@ private fun HomePane(
                 // Carátula a la derecha
                 Poster(
                     url = movie.streamIcon,
-                    title = movie.name,
+                    title = movie.displayName,
                     modifier = Modifier
                         .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
                         .clickable { onMovie(movie) }
@@ -261,7 +261,7 @@ private fun HomePane(
                 items(movies, key = { it.id }) { m ->
                     Poster(
                         url = m.streamIcon,
-                        title = m.name,
+                        title = m.displayName,
                         modifier = Modifier
                             .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
                             .onFocusChanged { if (it.isFocused) featured = m }
