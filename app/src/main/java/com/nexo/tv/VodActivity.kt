@@ -47,6 +47,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +72,7 @@ import coil.compose.AsyncImage
 import com.nexo.tv.data.ContinueWatching
 import com.nexo.tv.player.StreamBridge
 import com.nexo.tv.player.VlcEngine
+import com.nexo.tv.ui.ResumePrompt
 import kotlinx.coroutines.delay
 import org.videolan.libvlc.util.VLCVideoLayout
 
@@ -104,6 +106,9 @@ class VodActivity : ComponentActivity() {
                     }
                 )
             }
+            var showResumePrompt by remember { mutableStateOf(pendingResume > 20_000L) }
+            val promptShowing = rememberUpdatedState(showResumePrompt)
+            val resumePending = rememberUpdatedState(pendingResume)
             val rootFocus = remember { FocusRequester() }
             val playFocus = remember { FocusRequester() }
 
@@ -132,10 +137,15 @@ class VodActivity : ComponentActivity() {
                 engine.onPlaying = {
                     playing = true
                     duration = engine.lengthMs()
-                    if (pendingResume > 0L) {
-                        val seek = pendingResume
-                        pendingResume = 0L
-                        engine.seekTo(seek)
+                    if (!promptShowing.value) {
+                        val seek = resumePending.value
+                        if (seek > 0L) {
+                            pendingResume = 0L
+                            engine.seekTo(seek)
+                        }
+                    } else {
+                        engine.pause()
+                        playing = false
                     }
                 }
                 if (url.isNotBlank()) engine.playVod(StreamBridge.maybeWrap(url))
@@ -162,6 +172,13 @@ class VodActivity : ComponentActivity() {
                 }
             }
 
+            LaunchedEffect(showResumePrompt) {
+                if (showResumePrompt) {
+                    engine.pause()
+                    playing = false
+                }
+            }
+
             LaunchedEffect(hudTick) {
                 if (!showHud) return@LaunchedEffect
                 delay(8000)
@@ -184,11 +201,13 @@ class VodActivity : ComponentActivity() {
             }
 
             BackHandler {
-                if (showHud) {
-                    showHud = false
-                } else {
-                    persistProgress()
-                    finish()
+                when {
+                    showResumePrompt -> finish()
+                    showHud -> showHud = false
+                    else -> {
+                        persistProgress()
+                        finish()
+                    }
                 }
             }
 
@@ -197,9 +216,10 @@ class VodActivity : ComponentActivity() {
                     .fillMaxSize()
                     .background(Color.Black)
                     .focusRequester(rootFocus)
-                    .focusProperties { canFocus = !showHud }
+                    .focusProperties { canFocus = !showHud && !showResumePrompt }
                     .focusable()
                     .onPreviewKeyEvent { e ->
+                        if (showResumePrompt) return@onPreviewKeyEvent false
                         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                         if (e.nativeKeyEvent.repeatCount > 0) return@onPreviewKeyEvent true
                         val code = e.nativeKeyEvent.keyCode
@@ -395,6 +415,30 @@ class VodActivity : ComponentActivity() {
                             .align(Alignment.Center)
                             .background(Color(0xCC000000), RoundedCornerShape(10.dp))
                             .padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+
+                if (showResumePrompt) {
+                    ResumePrompt(
+                        title = "¿Seguir viendo?",
+                        subtitle = title.ifBlank { null },
+                        onContinue = {
+                            showResumePrompt = false
+                            val seek = pendingResume
+                            pendingResume = 0L
+                            if (seek > 0L) engine.seekTo(seek)
+                            engine.resume()
+                            playing = true
+                            bumpHud()
+                        },
+                        onFromStart = {
+                            showResumePrompt = false
+                            pendingResume = 0L
+                            engine.seekTo(0L)
+                            engine.resume()
+                            playing = true
+                            bumpHud()
+                        }
                     )
                 }
             }

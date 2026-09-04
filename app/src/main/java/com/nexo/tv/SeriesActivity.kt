@@ -54,6 +54,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,6 +87,7 @@ import com.nexo.tv.data.SeriesItem
 import com.nexo.tv.data.XtreamClient
 import com.nexo.tv.player.StreamBridge
 import com.nexo.tv.player.VlcEngine
+import com.nexo.tv.ui.ResumePrompt
 import kotlinx.coroutines.delay
 import org.videolan.libvlc.util.VLCVideoLayout
 import kotlin.math.roundToInt
@@ -135,6 +137,10 @@ class SeriesActivity : ComponentActivity() {
             var slotH by remember { mutableIntStateOf(0) }
             var pendingResume by remember { mutableLongStateOf(0L) }
             var autoNextArmed by remember { mutableStateOf(true) }
+            var showResumePrompt by remember { mutableStateOf(false) }
+            var resumeChoiceMs by remember { mutableLongStateOf(0L) }
+            var expandAfterChoice by remember { mutableStateOf(false) }
+            val promptShowing = rememberUpdatedState(showResumePrompt)
             val playFocus = remember { FocusRequester() }
             val density = LocalDensity.current
 
@@ -176,6 +182,44 @@ class SeriesActivity : ComponentActivity() {
                 if (expand) fullScreen = true
             }
 
+            fun applyResumeChoice(continueWatching: Boolean) {
+                showResumePrompt = false
+                val seek = if (continueWatching) resumeChoiceMs else 0L
+                resumeChoiceMs = 0L
+                pendingResume = 0L
+                if (seek > 0L) engine.seekTo(seek) else engine.seekTo(0L)
+                engine.resume()
+                playing = true
+                if (expandAfterChoice) {
+                    fullScreen = true
+                    bumpHud()
+                }
+                expandAfterChoice = false
+            }
+
+            fun requestFullscreen() {
+                if (showResumePrompt) return
+                val saved = ContinueWatching.get(this@SeriesActivity, "series", seriesId)
+                val ep = selectedEpisode
+                val atStart = engine.timeMs() < 15_000L
+                if (
+                    ep != null &&
+                    saved != null &&
+                    saved.episodeId == ep.id &&
+                    saved.positionMs > 20_000L &&
+                    atStart
+                ) {
+                    resumeChoiceMs = saved.positionMs
+                    expandAfterChoice = true
+                    showResumePrompt = true
+                    engine.pause()
+                    playing = false
+                } else {
+                    fullScreen = true
+                    bumpHud()
+                }
+            }
+
             fun nextEpisode(): SeriesEpisode? {
                 val keys = seasons.keys.toList()
                 val season = selectedSeason ?: return null
@@ -198,6 +242,8 @@ class SeriesActivity : ComponentActivity() {
                 playEpisode(next, expand = true)
             }
 
+            val goNextRef = rememberUpdatedState(newValue = { goNextEpisode() })
+
             fun openRelated(item: SeriesItem) {
                 persistProgress()
                 startActivity(
@@ -218,13 +264,16 @@ class SeriesActivity : ComponentActivity() {
                     playing = true
                     duration = engine.lengthMs()
                     nextEpisodeMsg = false
-                    if (pendingResume > 0L) {
+                    if (promptShowing.value) {
+                        engine.pause()
+                        playing = false
+                    } else if (pendingResume > 0L) {
                         val seek = pendingResume
                         pendingResume = 0L
                         engine.seekTo(seek)
                     }
                 }
-                engine.onEnded = { goNextEpisode() }
+                engine.onEnded = { goNextRef.value.invoke() }
                 onDispose {
                     persistProgress()
                     engine.release()
@@ -267,7 +316,14 @@ class SeriesActivity : ComponentActivity() {
                 if (detail.episodes.isEmpty()) {
                     error = "No se encontraron episodios"
                 } else if (startEp != null) {
-                    playEpisode(startEp, expand = false, resumeMs = wantResume)
+                    if (wantResume > 20_000L) {
+                        resumeChoiceMs = wantResume
+                        expandAfterChoice = resumeFromIntent > 0L
+                        showResumePrompt = true
+                        playEpisode(startEp, expand = false, resumeMs = 0L)
+                    } else {
+                        playEpisode(startEp, expand = false, resumeMs = wantResume)
+                    }
                 }
 
                 val all = runCatching { XtreamClient.series() }.getOrDefault(emptyList())
@@ -343,6 +399,12 @@ class SeriesActivity : ComponentActivity() {
 
             BackHandler {
                 when {
+                    showResumePrompt -> {
+                        showResumePrompt = false
+                        resumeChoiceMs = 0L
+                        expandAfterChoice = false
+                        pendingResume = 0L
+                    }
                     fullScreen -> fullScreen = false
                     else -> {
                         persistProgress()
@@ -594,8 +656,7 @@ class SeriesActivity : ComponentActivity() {
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         SeriesActionButton("Pantalla completa", Icons.Filled.Tv, true) {
-                                            fullScreen = true
-                                            bumpHud()
+                                            requestFullscreen()
                                         }
                                         SeriesActionButton("Idioma y subtítulos", Icons.Filled.Subtitles, false) {
                                             toast = engine.cycleAudioTrack()
@@ -881,6 +942,15 @@ class SeriesActivity : ComponentActivity() {
                             .zIndex(5f)
                             .background(Color(0xCC000000), RoundedCornerShape(10.dp))
                             .padding(horizontal = 18.dp, vertical = 12.dp)
+                    )
+                }
+
+                if (showResumePrompt) {
+                    ResumePrompt(
+                        title = "¿Seguir viendo?",
+                        subtitle = selectedEpisode?.let { "T${it.season} · E${it.episodeNum}" },
+                        onContinue = { applyResumeChoice(continueWatching = true) },
+                        onFromStart = { applyResumeChoice(continueWatching = false) }
                     )
                 }
             }
