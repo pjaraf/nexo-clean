@@ -36,9 +36,11 @@ class VlcEngine(context: Context) {
         player.setEventListener { ev ->
             when (ev.type) {
                 MediaPlayer.Event.Playing -> main.post {
+                    applyForce169()
                     onBuffering?.invoke(false)
                     onPlaying?.invoke()
                 }
+                MediaPlayer.Event.Vout -> main.post { applyForce169() }
                 MediaPlayer.Event.Buffering -> {
                     val pct = ev.buffering
                     main.post { onBuffering?.invoke(pct < 92f) }
@@ -56,6 +58,27 @@ class VlcEngine(context: Context) {
         } catch (_: Throwable) {}
         layout = view
         player.attachViews(view, null, false, false)
+        applyForce169()
+    }
+
+    /** Estira canales 4:3 (y cualquier otro) a pantalla 16:9 sin bandas negras. */
+    private fun applyForce169() {
+        if (released) return
+        try {
+            player.videoScale = MediaPlayer.ScaleType.SURFACE_FILL
+        } catch (_: Throwable) {
+            try {
+                player.setAspectRatio("16:9")
+                player.setScale(0f)
+            } catch (e: Throwable) {
+                Log.w(TAG, "force 16:9 failed: ${e.message}")
+            }
+        }
+        try {
+            // Refuerzo: trata el video como 16:9 al renderizar
+            player.setAspectRatio("16:9")
+            player.setScale(0f)
+        } catch (_: Throwable) {}
     }
 
     fun playNow(url: String) = schedule(url, 0L)
@@ -110,7 +133,9 @@ class VlcEngine(context: Context) {
             }
             player.media = media
             media.release()
+            applyForce169()
             player.play()
+            main.post { applyForce169() }
         } catch (e: Throwable) {
             Log.e(TAG, "play failed $url", e)
             onError?.invoke()
