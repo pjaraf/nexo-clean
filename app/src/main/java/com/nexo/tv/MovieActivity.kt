@@ -764,30 +764,31 @@ class MovieActivity : ComponentActivity() {
                                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        MovieHudBtn(Icons.Filled.Replay10, "−10s") {
+                                        MovieHudBtn(Icons.Filled.Replay10, "−10s", onFocused = { bumpHud() }) {
                                             engine.seekBy(-10_000); bumpHud()
                                         }
                                         MovieHudBtn(
                                             if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                             if (playing) "Pausa" else "Play",
-                                            playFocus
+                                            playFocus,
+                                            onFocused = { bumpHud() }
                                         ) {
                                             engine.togglePause()
                                             playing = engine.isPlaying
                                             bumpHud()
                                         }
-                                        MovieHudBtn(Icons.Filled.Forward10, "+10s") {
+                                        MovieHudBtn(Icons.Filled.Forward10, "+10s", onFocused = { bumpHud() }) {
                                             engine.seekBy(10_000); bumpHud()
                                         }
-                                        MovieHudBtn(Icons.Filled.Translate, "Audio") {
+                                        MovieHudBtn(Icons.Filled.Translate, "Audio", onFocused = { bumpHud() }) {
                                             toast = engine.cycleAudioTrack() ?: "Sin audio"
                                             bumpHud()
                                         }
-                                        MovieHudBtn(Icons.Filled.Subtitles, "Subs") {
+                                        MovieHudBtn(Icons.Filled.Subtitles, "Subs", onFocused = { bumpHud() }) {
                                             toast = engine.cycleSubtitleTrack()
                                             bumpHud()
                                         }
-                                        MovieHudBtn(Icons.Filled.AspectRatio, "Pantalla") {
+                                        MovieHudBtn(Icons.Filled.AspectRatio, "Pantalla", onFocused = { bumpHud() }) {
                                             toast = engine.cycleAspectMode()
                                             bumpHud()
                                         }
@@ -898,6 +899,7 @@ private fun MovieHudBtn(
     icon: ImageVector,
     label: String,
     focusRequester: FocusRequester? = null,
+    onFocused: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -906,7 +908,10 @@ private fun MovieHudBtn(
             modifier = Modifier
                 .size(40.dp)
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-                .onFocusChanged { isFocused = it.isFocused }
+                .onFocusChanged {
+                    isFocused = it.isFocused
+                    if (it.isFocused) onFocused?.invoke()
+                }
                 .clip(CircleShape)
                 .background(if (isFocused) Color(0xFFDE5B17) else Color.White.copy(alpha = 0.16f))
                 .clickable(onClick = onClick)
