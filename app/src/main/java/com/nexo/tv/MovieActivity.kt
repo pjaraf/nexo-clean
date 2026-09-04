@@ -138,6 +138,7 @@ class MovieActivity : ComponentActivity() {
             var showResumePrompt by remember { mutableStateOf(false) }
             var resumeChoiceMs by remember { mutableLongStateOf(0L) }
             var expandAfterChoice by remember { mutableStateOf(false) }
+            var resumeResolved by remember { mutableStateOf(false) }
             val promptShowing = rememberUpdatedState(showResumePrompt)
             val playFocus = remember { FocusRequester() }
             val density = LocalDensity.current
@@ -175,24 +176,24 @@ class MovieActivity : ComponentActivity() {
 
             fun applyResumeChoice(continueWatching: Boolean) {
                 showResumePrompt = false
+                resumeResolved = true
                 val seek = if (continueWatching) resumeChoiceMs else 0L
                 resumeChoiceMs = 0L
-                pendingResume = 0L
-                if (seek > 0L) engine.seekTo(seek) else engine.seekTo(0L)
-                engine.resume()
-                playing = true
-                if (expandAfterChoice) {
-                    fullScreen = true
-                    bumpHud()
-                }
+                val expand = expandAfterChoice
                 expandAfterChoice = false
+                playMovie(resumeMs = seek, expand = expand)
             }
 
             fun requestFullscreen() {
                 if (showResumePrompt) return
                 val saved = ContinueWatching.get(this@MovieActivity, "movie", movieId)
                 val atStart = engine.timeMs() < 15_000L
-                if (saved != null && saved.positionMs > 20_000L && atStart) {
+                if (
+                    !resumeResolved &&
+                    saved != null &&
+                    saved.positionMs > 20_000L &&
+                    atStart
+                ) {
                     resumeChoiceMs = saved.positionMs
                     expandAfterChoice = true
                     showResumePrompt = true
@@ -258,11 +259,11 @@ class MovieActivity : ComponentActivity() {
                 }
                 if (wantResume > 20_000L) {
                     resumeChoiceMs = wantResume
-                    // Quedar en detalle con mini player (no saltar a pantalla completa).
                     expandAfterChoice = false
                     showResumePrompt = true
-                    playMovie(resumeMs = 0L)
+                    // No reproducir hasta que el usuario elija (evita mini player negro).
                 } else {
+                    resumeResolved = true
                     playMovie(resumeMs = wantResume)
                 }
 

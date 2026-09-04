@@ -142,6 +142,7 @@ class SeriesActivity : ComponentActivity() {
             var showResumePrompt by remember { mutableStateOf(false) }
             var resumeChoiceMs by remember { mutableLongStateOf(0L) }
             var expandAfterChoice by remember { mutableStateOf(false) }
+            var resumeResolved by remember { mutableStateOf(false) }
             val promptShowing = rememberUpdatedState(showResumePrompt)
             val playFocus = remember { FocusRequester() }
             val density = LocalDensity.current
@@ -186,17 +187,13 @@ class SeriesActivity : ComponentActivity() {
 
             fun applyResumeChoice(continueWatching: Boolean) {
                 showResumePrompt = false
+                resumeResolved = true
                 val seek = if (continueWatching) resumeChoiceMs else 0L
                 resumeChoiceMs = 0L
-                pendingResume = 0L
-                if (seek > 0L) engine.seekTo(seek) else engine.seekTo(0L)
-                engine.resume()
-                playing = true
-                if (expandAfterChoice) {
-                    fullScreen = true
-                    bumpHud()
-                }
+                val expand = expandAfterChoice
                 expandAfterChoice = false
+                val ep = selectedEpisode ?: return
+                playEpisode(ep, expand = expand, resumeMs = seek)
             }
 
             fun requestFullscreen() {
@@ -205,6 +202,7 @@ class SeriesActivity : ComponentActivity() {
                 val ep = selectedEpisode
                 val atStart = engine.timeMs() < 15_000L
                 if (
+                    !resumeResolved &&
                     ep != null &&
                     saved != null &&
                     saved.episodeId == ep.id &&
@@ -322,8 +320,9 @@ class SeriesActivity : ComponentActivity() {
                         resumeChoiceMs = wantResume
                         expandAfterChoice = resumeFromIntent > 0L
                         showResumePrompt = true
-                        playEpisode(startEp, expand = false, resumeMs = 0L)
+                        // Esperar elección antes de reproducir.
                     } else {
+                        resumeResolved = true
                         playEpisode(startEp, expand = false, resumeMs = wantResume)
                     }
                 }

@@ -69,9 +69,7 @@ class VlcEngine(context: Context) {
             if (layout != null) player.detachViews()
         } catch (_: Throwable) {}
         layout = view
-        // SurfaceView: mejor rendimiento en TV Box. El HUD fullscreen va en Dialog
-        // (ventana aparte) para no quedar tapado por el surface.
-        player.attachViews(view, null, true, false)
+        player.attachViews(view, null, false, false)
         applyAspectMode()
     }
 
