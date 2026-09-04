@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -157,7 +158,7 @@ fun HubScreen(onLogout: () -> Unit) {
                 )
                 Tab.SERIES -> Box(
                     Modifier
-                        .padding(start = 88.dp, top = 24.dp, end = 24.dp, bottom = 24.dp)
+                        .padding(start = 88.dp, top = 12.dp, end = 16.dp, bottom = 12.dp)
                         .fillMaxSize()
                 ) {
                     if (series.isEmpty()) {
@@ -178,7 +179,7 @@ fun HubScreen(onLogout: () -> Unit) {
                 }
                 Tab.MOVIES -> Box(
                     Modifier
-                        .padding(start = 88.dp, top = 24.dp, end = 24.dp, bottom = 24.dp)
+                        .padding(start = 88.dp, top = 12.dp, end = 16.dp, bottom = 12.dp)
                         .fillMaxSize()
                 ) {
                     if (movies2026.isEmpty()) {
@@ -319,6 +320,8 @@ private fun HomePane(
                     url = movie.streamIcon,
                     title = movie.displayName,
                     modifier = Modifier
+                        .width(PosterW)
+                        .height(PosterH)
                         .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
                         .clickable { onMovie(movie) }
                         .focusable()
@@ -346,6 +349,8 @@ private fun HomePane(
                         url = m.streamIcon,
                         title = m.displayName,
                         modifier = Modifier
+                            .width(PosterW)
+                            .height(PosterH)
                             .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
                             .onFocusChanged { if (it.isFocused) featured = m }
                             .clickable { onMovie(m) }
@@ -362,21 +367,47 @@ private fun PosterGrid(
     items: List<Pair<String, Pair<String?, String>>>,
     onClick: (String) -> Unit = {}
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(140.dp),
-        contentPadding = PaddingValues(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        items(items, key = { it.first }) { (id, pair) ->
-            Poster(
-                url = pair.first,
-                title = pair.second,
-                modifier = Modifier
-                    .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
-                    .clickable { onClick(id) }
-                    .focusable()
-            )
+    val cols = 6
+    val rowsVisible = 2
+    val hGap = 10.dp
+    val vGap = 10.dp
+    val edgePad = 8.dp
+    // Margen para que el foco (scale) no recorte bordes.
+    val focusPad = 8.dp
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val usableW = maxWidth - edgePad * 2 - focusPad * 2
+        val usableH = maxHeight - edgePad * 2 - focusPad * 2
+        val cellW = (usableW - hGap * (cols - 1)) / cols
+        val cellH = (usableH - vGap * (rowsVisible - 1)) / rowsVisible
+        // Encaja 2:3 dentro de la celda para que quepan 6×2 enteras.
+        val posterW = minOf(cellW, cellH * 2f / 3f)
+        val posterH = posterW * 3f / 2f
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(cols),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(edgePad + focusPad),
+            horizontalArrangement = Arrangement.spacedBy(hGap),
+            verticalArrangement = Arrangement.spacedBy(vGap)
+        ) {
+            items(items, key = { it.first }) { (id, pair) ->
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Poster(
+                        url = pair.first,
+                        title = pair.second,
+                        modifier = Modifier
+                            .width(posterW)
+                            .height(posterH)
+                            .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
+                            .clickable { onClick(id) }
+                            .focusable()
+                    )
+                }
+            }
         }
     }
 }
@@ -386,10 +417,8 @@ private fun Poster(url: String?, title: String, modifier: Modifier = Modifier) {
     AsyncImage(
         model = url,
         contentDescription = title,
-        contentScale = ContentScale.Crop,
+        contentScale = ContentScale.Fit,
         modifier = modifier
-            .width(PosterW)
-            .height(PosterH)
             .clip(RoundedCornerShape(8.dp))
             .background(Color(0xFF222222))
     )
