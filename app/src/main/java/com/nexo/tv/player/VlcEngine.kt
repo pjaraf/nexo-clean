@@ -196,45 +196,67 @@ class VlcEngine(context: Context) {
         return tracks[idx].name
     }
 
-    enum class AspectMode { FILL, FIT_16_9, BEST_FIT }
+    /** Modos con cambio visible (llenar / zoom recorta barras / ratios / original). */
+    enum class AspectMode { FILL, ZOOM, RATIO_16_9, RATIO_4_3, ORIGINAL }
 
     private var aspectMode = AspectMode.FILL
 
     fun cycleAspectMode(): String {
         aspectMode = when (aspectMode) {
-            AspectMode.FILL -> AspectMode.FIT_16_9
-            AspectMode.FIT_16_9 -> AspectMode.BEST_FIT
-            AspectMode.BEST_FIT -> AspectMode.FILL
+            AspectMode.FILL -> AspectMode.ZOOM
+            AspectMode.ZOOM -> AspectMode.RATIO_16_9
+            AspectMode.RATIO_16_9 -> AspectMode.RATIO_4_3
+            AspectMode.RATIO_4_3 -> AspectMode.ORIGINAL
+            AspectMode.ORIGINAL -> AspectMode.FILL
         }
         applyAspectMode()
+        // Vout a veces pisa el scale; reaplicar un tick después
+        main.postDelayed({ applyAspectMode() }, 120L)
         return when (aspectMode) {
             AspectMode.FILL -> "Pantalla completa"
-            AspectMode.FIT_16_9 -> "16:9"
-            AspectMode.BEST_FIT -> "Original"
+            AspectMode.ZOOM -> "Zoom"
+            AspectMode.RATIO_16_9 -> "16:9"
+            AspectMode.RATIO_4_3 -> "4:3"
+            AspectMode.ORIGINAL -> "Original"
         }
     }
 
     private fun applyAspectMode() {
         if (released) return
         try {
+            // Limpiar antes: mezclar aspect 16:9 + FILL anulaba el cambio en películas.
+            player.setAspectRatio(null)
+            player.setScale(0f)
             when (aspectMode) {
                 AspectMode.FILL -> {
-                    try { player.videoScale = MediaPlayer.ScaleType.SURFACE_FILL } catch (_: Throwable) {}
-                    player.setAspectRatio("16:9")
-                    player.setScale(0f)
+                    setScaleType(MediaPlayer.ScaleType.SURFACE_FILL)
                 }
-                AspectMode.FIT_16_9 -> {
-                    try { player.videoScale = MediaPlayer.ScaleType.SURFACE_16_9 } catch (_: Throwable) {}
-                    player.setAspectRatio("16:9")
-                    player.setScale(0f)
+                AspectMode.ZOOM -> {
+                    // Recorta franjas negras típicas de cine (2.35 dentro de 16:9)
+                    setScaleType(MediaPlayer.ScaleType.SURFACE_BEST_FIT)
+                    player.setScale(1.35f)
                 }
-                AspectMode.BEST_FIT -> {
-                    try { player.videoScale = MediaPlayer.ScaleType.SURFACE_BEST_FIT } catch (_: Throwable) {}
-                    player.setAspectRatio(null)
-                    player.setScale(0f)
+                AspectMode.RATIO_16_9 -> {
+                    setScaleType(MediaPlayer.ScaleType.SURFACE_16_9)
+                }
+                AspectMode.RATIO_4_3 -> {
+                    setScaleType(MediaPlayer.ScaleType.SURFACE_4_3)
+                }
+                AspectMode.ORIGINAL -> {
+                    setScaleType(MediaPlayer.ScaleType.SURFACE_ORIGINAL)
                 }
             }
-        } catch (_: Throwable) {}
+        } catch (e: Throwable) {
+            Log.w(TAG, "applyAspectMode failed", e)
+        }
+    }
+
+    private fun setScaleType(type: MediaPlayer.ScaleType) {
+        try {
+            player.videoScale = type
+        } catch (e: Throwable) {
+            Log.w(TAG, "videoScale=$type failed", e)
+        }
     }
 
     private fun schedule(url: String, debounceMs: Long, vod: Boolean) {
