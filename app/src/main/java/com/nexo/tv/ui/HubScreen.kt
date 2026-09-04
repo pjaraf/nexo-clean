@@ -195,16 +195,6 @@ private fun HomePane(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Misma proporción/tamaño que el resto de carátulas
-                Poster(
-                    url = movie.streamIcon,
-                    title = movie.name,
-                    modifier = Modifier
-                        .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
-                        .clickable { onMovie(movie) }
-                        .focusable()
-                )
-                Spacer(Modifier.width(22.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = movie.name,
@@ -230,6 +220,16 @@ private fun HomePane(
                         Text("Reproducir", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                     }
                 }
+                Spacer(Modifier.width(22.dp))
+                // Carátula a la derecha
+                Poster(
+                    url = movie.streamIcon,
+                    title = movie.name,
+                    modifier = Modifier
+                        .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
+                        .clickable { onMovie(movie) }
+                        .focusable()
+                )
             }
         }
 
