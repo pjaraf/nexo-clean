@@ -13,10 +13,10 @@ import org.videolan.libvlc.util.VLCVideoLayout
 
 /**
  * Zapping más rápido:
- * - Debounce mínimo (solo si el mando dispara varias teclas)
- * - Soft-switch (cambia media sin stop) cuando hay margen
- * - stop + tick inmediato si el cambio es muy seguido (evita SIGSEGV)
- * - Cache live muy bajo
+ * - Debounce corto (coalesce teclas del mando; solo sintoniza el canal final)
+ * - Soft-switch (cambia media sin stop) cuando hay un mínimo de margen
+ * - stop inmediato si el cambio es muy seguido (evita SIGSEGV)
+ * - Cache live muy bajo + prefetch de vecinos
  */
 class VlcEngine(context: Context) {
     private val main = Handler(Looper.getMainLooper())
@@ -334,6 +334,7 @@ class VlcEngine(context: Context) {
     private fun prepareSwitch(url: String, myGen: Int, vod: Boolean) {
         val now = SystemClock.uptimeMillis()
         val gap = now - lastOpenAt
+        // Soft-switch: más rápido (sin stop). Solo hard-stop si el cambio es muy seguido.
         val useSoft = !vod && gap >= SOFT_MIN_GAP_MS
         if (!useSoft) {
             try {
@@ -345,7 +346,8 @@ class VlcEngine(context: Context) {
             openMedia(url, vod)
         }
         openRunnable = open
-        if (useSoft) main.post(open) else main.postDelayed(open, if (vod) 0L else STOP_SETTLE_MS)
+        // Tras stop no hace falta esperar; el soft va al instante.
+        main.post(open)
     }
 
     private fun openMedia(url: String, vod: Boolean) {
@@ -362,8 +364,10 @@ class VlcEngine(context: Context) {
                     addOption(":live-caching=$cache")
                     addOption(":clock-jitter=0")
                     addOption(":clock-synchro=0")
+                    addOption(":http-reconnect")
+                } else {
+                    addOption(":http-reconnect")
                 }
-                addOption(":http-reconnect")
                 addOption(":no-audio-time-stretch")
             }
             player.media = media
@@ -391,10 +395,12 @@ class VlcEngine(context: Context) {
 
     companion object {
         private const val TAG = "VlcEngine"
-        private const val ZAP_DEBOUNCE_MS = 30L
-        private const val STOP_SETTLE_MS = 20L
-        private const val SOFT_MIN_GAP_MS = 350L
-        private const val LIVE_CACHE_MS = 50
+        /** Coalesce teclas rápidas: solo sintoniza el canal donde te detienes. */
+        private const val ZAP_DEBOUNCE_MS = 70L
+        /** Soft-switch si el canal anterior ya abrió hace ≥ esto (evita SIGSEGV). */
+        private const val SOFT_MIN_GAP_MS = 120L
+        /** Cache vivo bajo = primer frame más rápido (puede pixelear un instante). */
+        private const val LIVE_CACHE_MS = 25
         private const val VOD_CACHE_MS = 1000
 
         private fun createLib(ctx: Context): LibVLC {

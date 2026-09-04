@@ -98,6 +98,18 @@ class LiveActivity : ComponentActivity() {
                 if (instant) engine.playNow(toPlay) else engine.playZap(toPlay)
             }
 
+            fun warmNeighbors(around: Int) {
+                if (channels.size < 2) return
+                val n = channels.size
+                val ids = listOf(
+                    channels[(around + 1) % n],
+                    channels[(around - 1 + n) % n]
+                )
+                for (ch in ids) {
+                    StreamBridge.warm(XtreamClient.liveUrl(ch.id))
+                }
+            }
+
             LaunchedEffect(bannerTick) {
                 if (bannerTick == 0) return@LaunchedEffect
                 delay(3500)
@@ -111,6 +123,7 @@ class LiveActivity : ComponentActivity() {
                 val first = channels.firstOrNull()
                 if (first != null) {
                     playChannel(first, instant = true)
+                    warmNeighbors(0)
                 } else {
                     status = "Sin canales"
                 }
@@ -124,6 +137,7 @@ class LiveActivity : ComponentActivity() {
                 if (channels.isEmpty()) return
                 index = (index + delta + channels.size) % channels.size
                 playChannel(channels[index], instant = false)
+                warmNeighbors(index)
             }
 
             BackHandler { finish() }

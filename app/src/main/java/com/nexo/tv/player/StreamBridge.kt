@@ -60,6 +60,27 @@ object StreamBridge {
         return if (remoteUrl.startsWith("https://", true)) wrap(remoteUrl) else remoteUrl
     }
 
+    /**
+     * Precalienta TCP/DNS del vecino (HEAD/Range corto) para que el siguiente zap
+     * arranque más rápido. No bloquea el hilo UI.
+     */
+    fun warm(remoteUrl: String) {
+        if (remoteUrl.isBlank()) return
+        val url = maybeWrap(remoteUrl)
+        pool.execute {
+            try {
+                val req = Request.Builder()
+                    .url(url)
+                    .header("Range", "bytes=0-1")
+                    .get()
+                    .build()
+                Http.client.newCall(req).execute().use { /* discard */ }
+            } catch (_: Throwable) {
+                // ignore: solo calentamiento
+            }
+        }
+    }
+
     private fun handle(socket: Socket) {
         socket.soTimeout = 60_000
         try {
