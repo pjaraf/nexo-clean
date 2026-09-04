@@ -419,6 +419,18 @@ class LiveActivity : ComponentActivity() {
         super.onStop()
     }
 
+    override fun onUserLeaveHint() {
+        // Home: cerrar app completa (guardando canal antes).
+        lastPlayed?.let { ch ->
+            getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(KEY_CHANNEL, ch.id)
+                .putString(KEY_CATEGORY, ch.categoryId.orEmpty())
+                .apply()
+        }
+        super.onUserLeaveHint()
+        exitNexoCompletely()
+    }
+
     companion object {
         const val EXTRA_USER = "user"
         const val EXTRA_PASS = "pass"
