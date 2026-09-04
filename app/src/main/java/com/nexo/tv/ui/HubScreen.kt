@@ -370,7 +370,7 @@ private fun PosterGrid(
     onClick: (String) -> Unit = {}
 ) {
     val cols = 6
-    val rowsPerPage = 2
+    val rowsPerPage = 3
     val pageSize = cols * rowsPerPage
     val pages = remember(items) { items.chunked(pageSize) }
     val listState = rememberLazyListState()
