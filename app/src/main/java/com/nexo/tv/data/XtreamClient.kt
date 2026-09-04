@@ -126,6 +126,81 @@ object XtreamClient {
         return runCatching { gson.fromJson<List<SeriesItem>>(json, type) }.getOrNull().orEmpty()
     }
 
+    /**
+     * @return cover (si viene en info) + mapa temporada → episodios
+     */
+    suspend fun seriesEpisodes(seriesId: String): Pair<String?, Map<String, List<SeriesEpisode>>> =
+        withContext(Dispatchers.IO) {
+            val empty: Map<String, List<SeriesEpisode>> = emptyMap()
+            val sid = seriesId.substringBefore(".0")
+            val json = fetch("get_series_info", mapOf("series_id" to sid))
+                ?: return@withContext null to empty
+            try {
+                val root = com.google.gson.JsonParser.parseString(json).asJsonObject
+                val info = root.getAsJsonObject("info")
+                val cover = jsonAsString(info?.get("cover"))
+                    ?: jsonAsString(info?.get("movie_image"))
+                val episodesRoot = root.get("episodes")
+                if (episodesRoot == null || !episodesRoot.isJsonObject) {
+                    return@withContext cover to empty
+                }
+                val unsorted = linkedMapOf<String, List<SeriesEpisode>>()
+                for ((seasonKey, seasonVal) in episodesRoot.asJsonObject.entrySet()) {
+                    val list = mutableListOf<SeriesEpisode>()
+                    val elements: List<com.google.gson.JsonElement> = when {
+                        seasonVal.isJsonArray -> seasonVal.asJsonArray.toList()
+                        seasonVal.isJsonObject -> seasonVal.asJsonObject.entrySet().map { it.value }
+                        else -> emptyList()
+                    }
+                    for (el in elements) {
+                        if (!el.isJsonObject) continue
+                        val o = el.asJsonObject
+                        val id = (jsonAsString(o.get("id")) ?: jsonAsString(o.get("episode_id")))
+                            ?.substringBefore(".0")
+                            .orEmpty()
+                        if (id.isBlank()) continue
+                        val epNum = jsonAsString(o.get("episode_num"))
+                            ?.substringBefore(".")
+                            ?.toIntOrNull()
+                            ?: 0
+                        val title = jsonAsString(o.get("title"))
+                            ?: jsonAsString(o.getAsJsonObject("info")?.get("name"))
+                            ?: ""
+                        val ext = jsonAsString(o.get("container_extension")) ?: "mp4"
+                        list.add(
+                            SeriesEpisode(
+                                id = id,
+                                season = seasonKey,
+                                episodeNum = epNum,
+                                title = title,
+                                ext = ext.ifBlank { "mp4" }
+                            )
+                        )
+                    }
+                    if (list.isNotEmpty()) {
+                        unsorted[seasonKey] = list.sortedBy { it.episodeNum }
+                    }
+                }
+                val sortedKeys = unsorted.keys.sortedWith(compareBy { it.toIntOrNull() ?: Int.MAX_VALUE })
+                val map = linkedMapOf<String, List<SeriesEpisode>>()
+                sortedKeys.forEach { map[it] = unsorted[it].orEmpty() }
+                cover to map
+            } catch (t: Throwable) {
+                android.util.Log.w("Xtream", "seriesEpisodes failed: ${t.message}")
+                null to empty
+            }
+        }
+
+    private fun jsonAsString(el: com.google.gson.JsonElement?): String? {
+        if (el == null || el.isJsonNull || !el.isJsonPrimitive) return null
+        val p = el.asJsonPrimitive
+        return when {
+            p.isNumber -> p.asNumber.toString()
+            p.isString -> p.asString
+            else -> runCatching { p.asString }.getOrNull()
+        }
+    }
+
     fun liveUrl(channelId: String): String {
         val u = Session.username
         val p = Session.password
@@ -151,5 +226,12 @@ object XtreamClient {
         val p = Session.password
         val e = ext.ifBlank { "mp4" }
         return "${Session.server.trimEnd('/')}/movie/$u/$p/${id.substringBefore(".0")}.$e"
+    }
+
+    fun seriesUrl(episodeId: String, ext: String): String {
+        val u = Session.username
+        val p = Session.password
+        val e = ext.ifBlank { "mp4" }
+        return "${Session.server.trimEnd('/')}/series/$u/$p/${episodeId.substringBefore(".0")}.$e"
     }
 }

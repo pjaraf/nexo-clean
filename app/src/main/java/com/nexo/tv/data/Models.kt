@@ -55,3 +55,22 @@ data class SeriesItem(
 ) {
     val id: String get() = seriesId?.toString()?.substringBefore(".0").orEmpty()
 }
+
+data class SeriesEpisode(
+    val id: String,
+    val season: String,
+    val episodeNum: Int,
+    val title: String,
+    val ext: String = "mp4"
+) {
+    val label: String
+        get() {
+            val ep = if (episodeNum > 0) "E$episodeNum" else "Ep"
+            val name = title.trim()
+            return if (name.isNotBlank() && !name.equals("Episode $episodeNum", true)) {
+                "$ep · $name"
+            } else {
+                "Episodio $episodeNum"
+            }
+        }
+}
