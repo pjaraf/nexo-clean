@@ -4,9 +4,9 @@ import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,11 +18,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -37,8 +36,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,6 +68,7 @@ import com.nexo.tv.data.Catalog
 import com.nexo.tv.data.SeriesItem
 import com.nexo.tv.data.VodItem
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val Orange = Color(0xFFDE5B17)
 private val PosterW = 132.dp
@@ -368,44 +370,95 @@ private fun PosterGrid(
     onClick: (String) -> Unit = {}
 ) {
     val cols = 6
-    val rowsVisible = 2
-    val hGap = 10.dp
-    val vGap = 10.dp
-    val edgePad = 8.dp
-    // Margen para que el foco (scale) no recorte bordes.
-    val focusPad = 8.dp
+    val rowsPerPage = 2
+    val pageSize = cols * rowsPerPage
+    val pages = remember(items) { items.chunked(pageSize) }
+    val listState = rememberLazyListState()
+    val snap = rememberSnapFlingBehavior(lazyListState = listState)
+    val scope = rememberCoroutineScope()
+    var focusedPage by remember { mutableIntStateOf(0) }
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val usableW = maxWidth - edgePad * 2 - focusPad * 2
-        val usableH = maxHeight - edgePad * 2 - focusPad * 2
-        val cellW = (usableW - hGap * (cols - 1)) / cols
-        val cellH = (usableH - vGap * (rowsVisible - 1)) / rowsVisible
-        // Encaja 2:3 dentro de la celda para que quepan 6×2 enteras.
-        val posterW = minOf(cellW, cellH * 2f / 3f)
-        val posterH = posterW * 3f / 2f
+    LaunchedEffect(focusedPage) {
+        if (pages.isEmpty()) return@LaunchedEffect
+        val target = focusedPage.coerceIn(0, pages.lastIndex)
+        listState.animateScrollToItem(target)
+    }
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(cols),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(edgePad + focusPad),
-            horizontalArrangement = Arrangement.spacedBy(hGap),
-            verticalArrangement = Arrangement.spacedBy(vGap)
-        ) {
-            items(items, key = { it.first }) { (id, pair) ->
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Poster(
-                        url = pair.first,
-                        title = pair.second,
+    LazyColumn(
+        state = listState,
+        flingBehavior = snap,
+        modifier = Modifier.fillMaxSize(),
+        userScrollEnabled = true
+    ) {
+        items(
+            count = pages.size,
+            key = { page -> "page-$page-${pages[page].firstOrNull()?.first}" }
+        ) { pageIndex ->
+            PosterPage(
+                items = pages[pageIndex],
+                cols = cols,
+                rows = rowsPerPage,
+                onClick = onClick,
+                onFocusPage = {
+                    if (focusedPage != pageIndex) {
+                        focusedPage = pageIndex
+                    } else {
+                        scope.launch { listState.animateScrollToItem(pageIndex) }
+                    }
+                },
+                modifier = Modifier.fillParentMaxSize()
+            )
+        }
+    }
+}
+
+@Composable
+private fun PosterPage(
+    items: List<Pair<String, Pair<String?, String>>>,
+    cols: Int,
+    rows: Int,
+    onClick: (String) -> Unit,
+    onFocusPage: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val hGap = 8.dp
+    val vGap = 8.dp
+    val pad = 6.dp
+    val rowItems = remember(items, cols) { items.chunked(cols) }
+
+    Column(
+        modifier = modifier.padding(pad),
+        verticalArrangement = Arrangement.spacedBy(vGap)
+    ) {
+        repeat(rows) { rowIndex ->
+            val row = rowItems.getOrNull(rowIndex).orEmpty()
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(hGap)
+            ) {
+                repeat(cols) { colIndex ->
+                    val item = row.getOrNull(colIndex)
+                    Box(
                         modifier = Modifier
-                            .width(posterW)
-                            .height(posterH)
-                            .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
-                            .clickable { onClick(id) }
-                            .focusable()
-                    )
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (item != null) {
+                            Poster(
+                                url = item.second.first,
+                                title = item.second.second,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.03f)
+                                    .onFocusChanged { if (it.isFocused) onFocusPage() }
+                                    .clickable { onClick(item.first) }
+                                    .focusable()
+                            )
+                        }
+                    }
                 }
             }
         }
