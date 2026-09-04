@@ -1,0 +1,83 @@
+name: Build and Release Nexo TV
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Restore signing keystore
+        run: |
+          # Mismo keystore de desarrollo (android/android) para que todas las APKs se puedan actualizar entre sí
+          echo "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" | base64 -d > debug.keystore
+          ls -la debug.keystore
+
+      - name: Compute version
+        id: ver
+        run: |
+          CODE=$((1000 + ${{ github.run_number }}))
+          NAME="2.2.${{ github.run_number }}"
+          TAG="v$NAME"
+          echo "version_code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "version_name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          cat > version.json <<EOF
+          {
+            "versionCode": $CODE,
+            "versionName": "$NAME",
+            "apkUrl": "https://github.com/pjaraf/nexo-clean/releases/download/$TAG/app-release.apk",
+            "changelog": "Actualización automática Nexo TV $NAME",
+            "mandatory": false
+          }
+          EOF
+          # Patch app version for this build
+          sed -i "s/versionCode = [0-9]*/versionCode = $CODE/" app/build.gradle.kts
+          sed -i "s/versionName = \"[^\"]*\"/versionName = \"$NAME\"/" app/build.gradle.kts
+          cat version.json
+          grep -E "versionCode|versionName" app/build.gradle.kts
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Build release APK
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Publish GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.ver.outputs.tag }}"
+          NAME="${{ steps.ver.outputs.version_name }}"
+          CODE="${{ steps.ver.outputs.version_code }}"
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
+          cp "$APK" app-release.apk
+          # version.json en la raíz del release para que la app lo lea
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" app-release.apk version.json --clobber
+          else
+            gh release create "$TAG" app-release.apk version.json \
+              --title "Nexo TV $NAME" \
+              --notes "Build automático #$CODE — cada push a main publica esta APK para actualizar todos los dispositivos."
+          fi
+          # Mantener también version.json en main como apuntador estable
+          echo "Release published: https://github.com/pjaraf/nexo-clean/releases/tag/$TAG"

@@ -17,6 +17,7 @@ captures/
 *.jks
 *.keystore
 debug.keystore
+debug.keystore.base64
 *.pem
 .env
 .env.*

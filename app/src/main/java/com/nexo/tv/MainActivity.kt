@@ -4,16 +4,20 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import com.nexo.tv.data.Catalog
 import com.nexo.tv.data.XtreamClient
 import com.nexo.tv.ui.HubScreen
 import com.nexo.tv.ui.LoginScreen
 import com.nexo.tv.ui.SplashScreen
+import com.nexo.tv.ui.UpdateGate
 
 private enum class AppScreen { Loading, Login, Hub }
 
@@ -26,7 +30,6 @@ class MainActivity : ComponentActivity() {
         val bootPass = intent.getStringExtra("pass")
         val bootServer = intent.getStringExtra("server")
         val hasBoot = !bootUser.isNullOrBlank() && !bootPass.isNullOrBlank()
-        // Si ya hay sesión guardada, no pedir usuario/clave otra vez
         val start = if (hasBoot || Session.isLoggedIn) AppScreen.Loading else AppScreen.Login
 
         setContent {
@@ -59,20 +62,22 @@ class MainActivity : ComponentActivity() {
                 screen = AppScreen.Hub
             }
 
-            when (screen) {
-                AppScreen.Loading -> SplashScreen(subtitle = splashMsg)
-                AppScreen.Login -> LoginScreen(
-                    onSuccess = {
-                        screen = AppScreen.Loading
-                    }
-                )
-                AppScreen.Hub -> HubScreen(
-                    onLogout = {
-                        Catalog.clear()
-                        Session.logout()
-                        screen = AppScreen.Login
-                    }
-                )
+            Box(Modifier.fillMaxSize()) {
+                when (screen) {
+                    AppScreen.Loading -> SplashScreen(subtitle = splashMsg)
+                    AppScreen.Login -> LoginScreen(onSuccess = { screen = AppScreen.Loading })
+                    AppScreen.Hub -> HubScreen(
+                        onLogout = {
+                            Catalog.clear()
+                            Session.logout()
+                            screen = AppScreen.Login
+                        }
+                    )
+                }
+                // Chequeo OTA en login y en hub
+                if (screen == AppScreen.Login || screen == AppScreen.Hub) {
+                    UpdateGate()
+                }
             }
         }
     }
