@@ -91,7 +91,7 @@ class LiveActivity : ComponentActivity() {
 
             fun playChannel(ch: LiveChannel, instant: Boolean) {
                 val remote = XtreamClient.liveUrl(ch.id)
-                val toPlay = if (remote.startsWith("http://", true)) remote else StreamBridge.wrap(remote)
+                val toPlay = StreamBridge.maybeWrap(remote)
                 android.util.Log.i("LiveActivity", "play $remote -> $toPlay")
                 status = ch.name
                 revealBanner()

@@ -107,13 +107,29 @@ class VlcEngine(context: Context) {
         0L
     }
 
+    private var pendingSeekMs: Long? = null
+    private var seekFlush: Runnable? = null
+
     fun seekBy(deltaMs: Long) {
         if (released) return
         try {
-            val len = player.length
-            val cur = player.time.coerceAtLeast(0L)
-            val target = (cur + deltaMs).coerceIn(0L, if (len > 0) len else cur + deltaMs)
-            player.time = target
+            val len = player.length.coerceAtLeast(0L)
+            val cur = pendingSeekMs ?: player.time.coerceAtLeast(0L)
+            val target = if (len > 0) {
+                (cur + deltaMs).coerceIn(0L, len)
+            } else {
+                (cur + deltaMs).coerceAtLeast(0L)
+            }
+            pendingSeekMs = target
+            // Debounce taps rápidos del mando; un solo seek real
+            seekFlush?.let { main.removeCallbacks(it) }
+            val flush = Runnable {
+                val t = pendingSeekMs ?: return@Runnable
+                pendingSeekMs = null
+                applySeek(t)
+            }
+            seekFlush = flush
+            main.postDelayed(flush, 180L)
         } catch (_: Throwable) {}
     }
 
@@ -121,8 +137,33 @@ class VlcEngine(context: Context) {
         if (released) return
         try {
             val len = player.length
-            player.time = if (len > 0) positionMs.coerceIn(0L, len) else positionMs.coerceAtLeast(0L)
+            val target = if (len > 0) positionMs.coerceIn(0L, len) else positionMs.coerceAtLeast(0L)
+            pendingSeekMs = null
+            seekFlush?.let { main.removeCallbacks(it) }
+            applySeek(target)
         } catch (_: Throwable) {}
+    }
+
+    private fun applySeek(positionMs: Long) {
+        if (released) return
+        try {
+            val len = player.length
+            if (len > 0L) {
+                player.position = (positionMs.toFloat() / len.toFloat()).coerceIn(0f, 0.999f)
+            } else {
+                player.time = positionMs
+            }
+            // Tras seek, algunos builds dejan el pipeline quieto si no se fuerza play
+            if (!player.isPlaying) player.play()
+            main.postDelayed({
+                if (released) return@postDelayed
+                try {
+                    if (!player.isPlaying) player.play()
+                } catch (_: Throwable) {}
+            }, 250L)
+        } catch (e: Throwable) {
+            Log.w(TAG, "seek failed", e)
+        }
     }
 
     data class Track(val id: Int, val name: String)

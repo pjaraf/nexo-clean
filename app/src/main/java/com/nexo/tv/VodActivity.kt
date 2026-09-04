@@ -97,7 +97,8 @@ class VodActivity : ComponentActivity() {
                     playing = true
                     duration = engine.lengthMs()
                 }
-                if (url.isNotBlank()) engine.playVod(StreamBridge.wrap(url))
+                // HTTP directo: VLC puede seek con Range. HTTPS va por StreamBridge.
+                if (url.isNotBlank()) engine.playVod(StreamBridge.maybeWrap(url))
                 onDispose { engine.release() }
             }
 

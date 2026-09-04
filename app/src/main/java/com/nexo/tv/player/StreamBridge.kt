@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * VLC en esta TV Box crashea (SIGSEGV/nettle) con HTTPS.
  * Este puente baja el stream con OkHttp (TLS de Java) y se lo da a VLC por HTTP local.
+ * Soporta Range/206 para que el seek de VOD no se congele.
  */
 object StreamBridge {
     private const val TAG = "StreamBridge"
@@ -54,8 +55,13 @@ object StreamBridge {
         return "http://127.0.0.1:$port/$id"
     }
 
+    /** Solo HTTPS necesita el puente; HTTP se reproduce directo (seek OK). */
+    fun maybeWrap(remoteUrl: String): String {
+        return if (remoteUrl.startsWith("https://", true)) wrap(remoteUrl) else remoteUrl
+    }
+
     private fun handle(socket: Socket) {
-        socket.soTimeout = 25000
+        socket.soTimeout = 60_000
         try {
             val input = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.ISO_8859_1))
             val requestLine = input.readLine() ?: return
@@ -66,21 +72,36 @@ object StreamBridge {
             val remote = targets[id]
             val out = socket.getOutputStream()
             if (remote.isNullOrBlank()) {
-                writeHead(out, 404, "text/plain", 0)
+                writeStatus(out, 404, "Not Found", emptyMap(), 0)
                 return
             }
-            val req = Request.Builder()
+
+            var rangeHeader: String? = null
+            while (true) {
+                val line = input.readLine() ?: break
+                if (line.isEmpty()) break
+                val idx = line.indexOf(':')
+                if (idx <= 0) continue
+                val name = line.substring(0, idx).trim()
+                val value = line.substring(idx + 1).trim()
+                if (name.equals("Range", ignoreCase = true)) rangeHeader = value
+            }
+
+            val reqBuilder = Request.Builder()
                 .url(remote)
                 .header("User-Agent", "NexoPlayer/2.0")
                 .header("Accept", "*/*")
-                .build()
-            Http.client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) {
-                    writeHead(out, resp.code, "text/plain", 0)
+            if (!rangeHeader.isNullOrBlank()) {
+                reqBuilder.header("Range", rangeHeader)
+            }
+
+            Http.client.newCall(reqBuilder.build()).execute().use { resp ->
+                if (!resp.isSuccessful && resp.code != 206) {
+                    writeStatus(out, resp.code, "Error", emptyMap(), 0)
                     return
                 }
                 val body = resp.body ?: run {
-                    writeHead(out, 502, "text/plain", 0)
+                    writeStatus(out, 502, "Bad Gateway", emptyMap(), 0)
                     return
                 }
                 val finalUrl = resp.request.url.toString()
@@ -93,16 +114,35 @@ object StreamBridge {
                     val text = body.string()
                     val rewritten = rewritePlaylist(text, finalUrl)
                     val bytes = rewritten.toByteArray(Charsets.UTF_8)
-                    writeHead(out, 200, "application/vnd.apple.mpegurl", bytes.size)
+                    writeStatus(
+                        out,
+                        200,
+                        "OK",
+                        mapOf(
+                            "Content-Type" to "application/vnd.apple.mpegurl",
+                            "Accept-Ranges" to "bytes"
+                        ),
+                        bytes.size
+                    )
                     out.write(bytes)
                 } else {
                     val len = body.contentLength()
-                    writeHead(
-                        out,
-                        200,
-                        ctype.ifBlank { "application/octet-stream" },
-                        if (len > 0) len.toInt() else -1
-                    )
+                    val headers = linkedMapOf<String, String>()
+                    headers["Content-Type"] = ctype.ifBlank { "application/octet-stream" }
+                    headers["Accept-Ranges"] = "bytes"
+                    resp.header("Content-Range")?.let { headers["Content-Range"] = it }
+                    resp.header("Content-Length")?.let { headers["Content-Length"] = it }
+                    val status = if (resp.code == 206) 206 else 200
+                    val reason = if (status == 206) "Partial Content" else "OK"
+                    val declaredLen = when {
+                        headers.containsKey("Content-Length") -> headers["Content-Length"]!!.toIntOrNull() ?: -1
+                        len > 0 -> len.toInt()
+                        else -> -1
+                    }
+                    if (!headers.containsKey("Content-Length") && declaredLen >= 0) {
+                        headers["Content-Length"] = declaredLen.toString()
+                    }
+                    writeStatus(out, status, reason, headers, if (headers.containsKey("Content-Length")) -2 else declaredLen)
                     body.byteStream().copyTo(out)
                 }
                 out.flush()
@@ -134,14 +174,29 @@ object StreamBridge {
         return base?.resolve(ref)?.toString() ?: ref
     }
 
-    private fun writeHead(out: java.io.OutputStream, code: Int, type: String, length: Int) {
-        val extra = if (length >= 0) "Content-Length: $length\r\n" else ""
-        val head = "HTTP/1.1 $code OK\r\n" +
-            "Content-Type: $type\r\n" +
-            extra +
-            "Connection: close\r\n" +
-            "Access-Control-Allow-Origin: *\r\n" +
-            "\r\n"
-        out.write(head.toByteArray(Charsets.ISO_8859_1))
+    /**
+     * @param length -2 = Content-Length already in headers; >=0 write Content-Length; -1 omit (chunked-like close)
+     */
+    private fun writeStatus(
+        out: java.io.OutputStream,
+        code: Int,
+        reason: String,
+        headers: Map<String, String>,
+        length: Int
+    ) {
+        val sb = StringBuilder()
+        sb.append("HTTP/1.1 $code $reason\r\n")
+        headers.forEach { (k, v) ->
+            if (!k.equals("Content-Length", true) || length == -2) {
+                sb.append("$k: $v\r\n")
+            }
+        }
+        if (length >= 0 && !headers.keys.any { it.equals("Content-Length", true) }) {
+            sb.append("Content-Length: $length\r\n")
+        }
+        sb.append("Connection: close\r\n")
+        sb.append("Access-Control-Allow-Origin: *\r\n")
+        sb.append("\r\n")
+        out.write(sb.toString().toByteArray(Charsets.ISO_8859_1))
     }
 }
