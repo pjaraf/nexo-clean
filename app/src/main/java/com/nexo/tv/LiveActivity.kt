@@ -1,5 +1,6 @@
 package com.nexo.tv
 
+import android.content.Context
 import android.os.Bundle
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.ViewGroup
@@ -13,18 +14,28 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,10 +51,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -51,7 +64,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import coil.compose.AsyncImage
+import com.nexo.tv.data.LiveCategory
 import com.nexo.tv.data.LiveChannel
 import com.nexo.tv.data.XtreamClient
 import com.nexo.tv.player.StreamBridge
@@ -69,14 +87,32 @@ class LiveActivity : ComponentActivity() {
         intent.getStringExtra(EXTRA_SERVER)?.let { if (it.isNotBlank()) Session.server = it }
         StreamBridge.start()
         val engine = VlcEngine(this)
+        val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
         setContent {
-            var channels by remember { mutableStateOf<List<LiveChannel>>(emptyList()) }
+            var allChannels by remember { mutableStateOf<List<LiveChannel>>(emptyList()) }
+            var categories by remember { mutableStateOf<List<LiveCategory>>(emptyList()) }
+            var selectedCategoryId by remember {
+                mutableStateOf(prefs.getString(KEY_CATEGORY, null).orEmpty())
+            }
             var index by remember { mutableIntStateOf(0) }
             var loading by remember { mutableStateOf(true) }
             var status by remember { mutableStateOf("Cargando…") }
             var showBanner by remember { mutableStateOf(false) }
             var bannerTick by remember { mutableIntStateOf(0) }
-            val focus = remember { FocusRequester() }
+            var showCategories by remember { mutableStateOf(false) }
+            val rootFocus = remember { FocusRequester() }
+            val categoryFocus = remember { FocusRequester() }
+            val listState = rememberLazyListState()
+
+            val activeChannels = remember(allChannels, selectedCategoryId) {
+                if (selectedCategoryId.isBlank()) allChannels
+                else allChannels.filter { it.categoryId == selectedCategoryId }.ifEmpty { allChannels }
+            }
+            val selectedCategoryName = remember(categories, selectedCategoryId) {
+                categories.firstOrNull { it.categoryId == selectedCategoryId }?.categoryName
+                    ?: if (selectedCategoryId.isBlank()) "Todas" else "Categoría"
+            }
 
             DisposableEffect(engine) {
                 engine.onPlaying = { status = "Reproduciendo" }
@@ -99,15 +135,41 @@ class LiveActivity : ComponentActivity() {
             }
 
             fun warmNeighbors(around: Int) {
-                if (channels.size < 2) return
-                val n = channels.size
-                val ids = listOf(
-                    channels[(around + 1) % n],
-                    channels[(around - 1 + n) % n]
-                )
-                for (ch in ids) {
+                val list = activeChannels
+                if (list.size < 2) return
+                val n = list.size
+                listOf(list[(around + 1) % n], list[(around - 1 + n) % n]).forEach { ch ->
                     StreamBridge.warm(XtreamClient.liveUrl(ch.id))
                 }
+            }
+
+            fun selectCategory(catId: String) {
+                selectedCategoryId = catId
+                prefs.edit().putString(KEY_CATEGORY, catId).apply()
+                showCategories = false
+                val list = if (catId.isBlank()) allChannels
+                else allChannels.filter { it.categoryId == catId }.ifEmpty { allChannels }
+                if (list.isEmpty()) {
+                    status = "Sin canales en categoría"
+                    return
+                }
+                index = 0
+                playChannel(list[0], instant = true)
+                warmNeighbors(0)
+                runCatching { rootFocus.requestFocus() }
+            }
+
+            fun zap(delta: Int) {
+                val list = activeChannels
+                if (list.isEmpty()) return
+                index = (index + delta + list.size) % list.size
+                playChannel(list[index], instant = false)
+                warmNeighbors(index)
+            }
+
+            fun openCategories() {
+                showCategories = true
+                revealBanner()
             }
 
             LaunchedEffect(bannerTick) {
@@ -116,39 +178,75 @@ class LiveActivity : ComponentActivity() {
                 showBanner = false
             }
 
+            LaunchedEffect(showCategories) {
+                if (showCategories) {
+                    delay(80)
+                    runCatching { categoryFocus.requestFocus() }
+                    val idx = categories.indexOfFirst { it.categoryId == selectedCategoryId }
+                        .coerceAtLeast(0)
+                    if (categories.isNotEmpty()) {
+                        runCatching { listState.scrollToItem(idx) }
+                    }
+                } else {
+                    delay(40)
+                    runCatching { rootFocus.requestFocus() }
+                }
+            }
+
             LaunchedEffect(Unit) {
-                channels = runCatching { XtreamClient.liveChannels() }.getOrDefault(emptyList())
+                val cats = runCatching { XtreamClient.liveCategories() }.getOrDefault(emptyList())
+                val streams = runCatching { XtreamClient.liveChannels() }.getOrDefault(emptyList())
+                    .filter { it.id.isNotBlank() }
+                categories = buildList {
+                    add(LiveCategory(categoryId = "", categoryName = "Todas"))
+                    addAll(cats.filter { it.categoryId.isNotBlank() })
+                }
+                allChannels = streams
                 loading = false
-                android.util.Log.i("LiveActivity", "channels=${channels.size} server=${Session.server}")
-                val first = channels.firstOrNull()
+                android.util.Log.i(
+                    "LiveActivity",
+                    "channels=${streams.size} cats=${cats.size} selected=$selectedCategoryId"
+                )
+
+                // Si la categoría guardada ya no existe, usar Todas
+                if (selectedCategoryId.isNotBlank() &&
+                    cats.none { it.categoryId == selectedCategoryId }
+                ) {
+                    selectedCategoryId = ""
+                    prefs.edit().putString(KEY_CATEGORY, "").apply()
+                }
+
+                val list = if (selectedCategoryId.isBlank()) streams
+                else streams.filter { it.categoryId == selectedCategoryId }.ifEmpty { streams }
+                val first = list.firstOrNull()
                 if (first != null) {
+                    index = 0
                     playChannel(first, instant = true)
                     warmNeighbors(0)
                 } else {
                     status = "Sin canales"
                 }
                 delay(120)
-                runCatching { focus.requestFocus() }
+                runCatching { rootFocus.requestFocus() }
             }
 
-            val current = channels.getOrNull(index)
+            val current = activeChannels.getOrNull(index)
 
-            fun zap(delta: Int) {
-                if (channels.isEmpty()) return
-                index = (index + delta + channels.size) % channels.size
-                playChannel(channels[index], instant = false)
-                warmNeighbors(index)
+            BackHandler {
+                when {
+                    showCategories -> showCategories = false
+                    else -> finish()
+                }
             }
-
-            BackHandler { finish() }
 
             Box(
                 Modifier
                     .fillMaxSize()
                     .background(Color.Black)
-                    .focusRequester(focus)
+                    .focusRequester(rootFocus)
                     .focusable()
                     .onKeyEvent { e ->
+                        if (showCategories) return@onKeyEvent false
                         if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                         if (e.nativeKeyEvent.repeatCount > 0) return@onKeyEvent true
                         when (e.nativeKeyEvent.keyCode) {
@@ -162,9 +260,13 @@ class LiveActivity : ComponentActivity() {
                             AndroidKeyEvent.KEYCODE_PAGE_UP -> {
                                 zap(-1); true
                             }
-                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                            AndroidKeyEvent.KEYCODE_ENTER,
+                            AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+                            AndroidKeyEvent.KEYCODE_MENU,
                             AndroidKeyEvent.KEYCODE_INFO -> {
+                                openCategories(); true
+                            }
+                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                            AndroidKeyEvent.KEYCODE_ENTER -> {
                                 if (current != null) revealBanner()
                                 true
                             }
@@ -181,6 +283,7 @@ class LiveActivity : ComponentActivity() {
                             )
                             keepScreenOn = true
                             isFocusable = false
+                            isFocusableInTouchMode = false
                             engine.attach(this)
                         }
                     },
@@ -188,19 +291,63 @@ class LiveActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize()
                 )
 
-                AnimatedVisibility(
-                    visible = showBanner && current != null,
-                    enter = slideInHorizontally { -it } + fadeIn(),
-                    exit = slideOutHorizontally { -it } + fadeOut(),
-                    modifier = Modifier.align(Alignment.CenterStart)
-                ) {
-                    val ch = current
-                    if (ch != null) {
-                        ChannelSideBanner(number = index + 1, channel = ch)
+                // Banner canal (Popup sin foco: no bloquea el zapping)
+                if (showBanner && current != null && !showCategories) {
+                    Popup(
+                        alignment = Alignment.CenterStart,
+                        properties = PopupProperties(
+                            focusable = false,
+                            dismissOnBackPress = false,
+                            dismissOnClickOutside = false
+                        )
+                    ) {
+                        ChannelSideBanner(
+                            number = index + 1,
+                            channel = current,
+                            categoryName = selectedCategoryName
+                        )
                     }
                 }
 
-                if (channels.isEmpty() && !loading) {
+                if (showCategories) {
+                    Dialog(
+                        onDismissRequest = { showCategories = false },
+                        properties = DialogProperties(
+                            dismissOnBackPress = true,
+                            dismissOnClickOutside = false,
+                            usePlatformDefaultWidth = false,
+                            decorFitsSystemWindows = false
+                        )
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color.Transparent)
+                                .onPreviewKeyEvent { e ->
+                                    if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                                    when (e.nativeKeyEvent.keyCode) {
+                                        AndroidKeyEvent.KEYCODE_DPAD_LEFT,
+                                        AndroidKeyEvent.KEYCODE_BACK -> {
+                                            showCategories = false
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                }
+                        ) {
+                            CategorySidePanel(
+                                categories = categories,
+                                selectedCategoryId = selectedCategoryId,
+                                listState = listState,
+                                firstFocus = categoryFocus,
+                                onSelect = { selectCategory(it) },
+                                modifier = Modifier.align(Alignment.CenterEnd)
+                            )
+                        }
+                    }
+                }
+
+                if (allChannels.isEmpty() && !loading) {
                     Text(
                         text = status,
                         color = Color.White,
@@ -216,14 +363,106 @@ class LiveActivity : ComponentActivity() {
         const val EXTRA_USER = "user"
         const val EXTRA_PASS = "pass"
         const val EXTRA_SERVER = "server"
+        private const val PREFS = "nexo_live"
+        private const val KEY_CATEGORY = "category_id"
     }
 }
 
 @Composable
-private fun ChannelSideBanner(number: Int, channel: LiveChannel) {
+private fun CategorySidePanel(
+    categories: List<LiveCategory>,
+    selectedCategoryId: String,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    firstFocus: FocusRequester,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier
+            .fillMaxHeight()
+            .width(300.dp)
+            .background(
+                Brush.horizontalGradient(
+                    listOf(Color(0x00000000), Color(0xEE0A0A0A), Color(0xF5080808))
+                )
+            )
+            .padding(start = 18.dp, end = 14.dp, top = 18.dp, bottom = 18.dp)
+    ) {
+        Text(
+            "Categorías",
+            color = Color(0xFFDE5B17),
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            "Selecciona y queda guardada",
+            color = Color.White.copy(alpha = 0.55f),
+            fontSize = 12.sp,
+            modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+        )
+        LazyColumn(
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(bottom = 12.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            itemsIndexed(categories, key = { _, c -> c.categoryId.ifBlank { "all" } }) { i, cat ->
+                val selected = cat.categoryId == selectedCategoryId
+                var focused by remember { mutableStateOf(false) }
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (cat.categoryId == selectedCategoryId) Modifier.focusRequester(firstFocus)
+                            else Modifier
+                        )
+                        .onFocusChanged { focused = it.isFocused }
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            when {
+                                focused -> Color(0xFFDE5B17)
+                                selected -> Color.White.copy(alpha = 0.16f)
+                                else -> Color.White.copy(alpha = 0.06f)
+                            }
+                        )
+                        .border(
+                            BorderStroke(
+                                if (focused || selected) 2.dp else 1.dp,
+                                when {
+                                    focused -> Color.White
+                                    selected -> Color(0xFFDE5B17)
+                                    else -> Color.White.copy(alpha = 0.12f)
+                                }
+                            ),
+                            RoundedCornerShape(10.dp)
+                        )
+                        .clickable { onSelect(cat.categoryId) }
+                        .focusable()
+                        .padding(horizontal = 12.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        cat.categoryName.ifBlank { "Sin nombre" },
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = if (focused || selected) FontWeight.Bold else FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChannelSideBanner(
+    number: Int,
+    channel: LiveChannel,
+    categoryName: String
+) {
     Row(
         Modifier
-            .widthIn(min = 220.dp, max = 340.dp)
+            .widthIn(min = 220.dp, max = 360.dp)
             .background(
                 brush = Brush.horizontalGradient(
                     listOf(
@@ -264,12 +503,20 @@ private fun ChannelSideBanner(number: Int, channel: LiveChannel) {
             }
         }
         Spacer(Modifier.width(14.dp))
-        Column(Modifier.widthIn(max = 200.dp)) {
+        Column(Modifier.widthIn(max = 220.dp)) {
+            Text(
+                text = categoryName,
+                color = Color(0xFFDE5B17),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Text(
                 text = "%03d".format(number),
-                color = Color(0xFFDE5B17),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(2.dp))
             Text(
