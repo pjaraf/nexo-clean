@@ -1,0 +1,44 @@
+package com.nexo.tv.data
+
+import com.google.gson.annotations.SerializedName
+
+data class UserInfo(
+    val username: String? = null,
+    val status: String? = null,
+    val auth: Any? = null
+)
+
+data class LoginResponse(
+    @SerializedName("user_info") val userInfo: UserInfo? = null
+)
+
+data class LiveCategory(
+    @SerializedName("category_id") val categoryId: String = "",
+    @SerializedName("category_name") val categoryName: String = ""
+)
+
+data class LiveChannel(
+    @SerializedName("stream_id") val streamId: Any? = null,
+    val name: String = "",
+    @SerializedName("stream_icon") val streamIcon: String? = null,
+    @SerializedName("category_id") val categoryId: String? = null
+) {
+    val id: String get() = streamId?.toString()?.substringBefore(".0").orEmpty()
+}
+
+data class VodItem(
+    @SerializedName("stream_id") val streamId: Any? = null,
+    val name: String = "",
+    @SerializedName("stream_icon") val streamIcon: String? = null,
+    @SerializedName("container_extension") val ext: String? = "mp4"
+) {
+    val id: String get() = streamId?.toString()?.substringBefore(".0").orEmpty()
+}
+
+data class SeriesItem(
+    @SerializedName("series_id") val seriesId: Any? = null,
+    val name: String = "",
+    val cover: String? = null
+) {
+    val id: String get() = seriesId?.toString()?.substringBefore(".0").orEmpty()
+}
