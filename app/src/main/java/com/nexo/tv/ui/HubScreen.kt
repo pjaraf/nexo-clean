@@ -69,6 +69,7 @@ fun HubScreen(onLogout: () -> Unit) {
     var tab by remember { mutableStateOf(Tab.HOME) }
     val movies = Catalog.movies
     val series = Catalog.series
+    val movies2026 = remember(movies) { movies.filter { it.matchesYear(2026) } }
 
     Box(Modifier.fillMaxSize()) {
         // Fondo cinematográfico en todas las pestañas
@@ -77,7 +78,7 @@ fun HubScreen(onLogout: () -> Unit) {
         Box(Modifier.fillMaxSize()) {
             when (tab) {
                 Tab.HOME -> HomePane(
-                    movies = movies.take(30),
+                    movies = movies2026,
                     onMovie = { item ->
                         ctx.startActivity(
                             Intent(ctx, VodActivity::class.java)
@@ -98,17 +99,26 @@ fun HubScreen(onLogout: () -> Unit) {
                         .padding(start = 88.dp, top = 24.dp, end = 24.dp, bottom = 24.dp)
                         .fillMaxSize()
                 ) {
-                    PosterGrid(
-                        items = movies.map { it.id to (it.streamIcon to it.name) },
-                        onClick = { id ->
-                            val item = movies.find { it.id == id } ?: return@PosterGrid
-                            ctx.startActivity(
-                                Intent(ctx, VodActivity::class.java)
-                                    .putExtra(VodActivity.EXTRA_URL, XtreamClient.movieUrl(item.id, item.ext ?: "mp4"))
-                                    .putExtra(VodActivity.EXTRA_TITLE, item.name)
-                            )
-                        }
-                    )
+                    if (movies2026.isEmpty()) {
+                        Text(
+                            "No hay películas de 2026",
+                            color = Color.White.copy(alpha = 0.75f),
+                            fontSize = 18.sp,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    } else {
+                        PosterGrid(
+                            items = movies2026.map { it.id to (it.streamIcon to it.name) },
+                            onClick = { id ->
+                                val item = movies2026.find { it.id == id } ?: return@PosterGrid
+                                ctx.startActivity(
+                                    Intent(ctx, VodActivity::class.java)
+                                        .putExtra(VodActivity.EXTRA_URL, XtreamClient.movieUrl(item.id, item.ext ?: "mp4"))
+                                        .putExtra(VodActivity.EXTRA_TITLE, item.name)
+                                )
+                            }
+                        )
+                    }
                 }
                 Tab.TV -> {}
             }
@@ -234,22 +244,31 @@ private fun HomePane(
         }
 
         Spacer(Modifier.weight(1f))
-        Text("Películas", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Text("Películas 2026", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(movies, key = { it.id }) { m ->
-                Poster(
-                    url = m.streamIcon,
-                    title = m.name,
-                    modifier = Modifier
-                        .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
-                        .onFocusChanged { if (it.isFocused) featured = m }
-                        .clickable { onMovie(m) }
-                        .focusable()
-                )
+        if (movies.isEmpty()) {
+            Text(
+                "No hay películas de 2026 en el catálogo",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 14.sp,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 14.dp)
+            )
+        } else {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(movies, key = { it.id }) { m ->
+                    Poster(
+                        url = m.streamIcon,
+                        title = m.name,
+                        modifier = Modifier
+                            .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
+                            .onFocusChanged { if (it.isFocused) featured = m }
+                            .clickable { onMovie(m) }
+                            .focusable()
+                    )
+                }
             }
         }
     }
