@@ -127,22 +127,23 @@ object XtreamClient {
     }
 
     /**
-     * @return cover (si viene en info) + mapa temporada → episodios
+     * Detalle de serie: info (sinopsis, actores, cover) + episodios por temporada.
      */
-    suspend fun seriesEpisodes(seriesId: String): Pair<String?, Map<String, List<SeriesEpisode>>> =
+    suspend fun seriesDetail(seriesId: String): SeriesDetail =
         withContext(Dispatchers.IO) {
-            val empty: Map<String, List<SeriesEpisode>> = emptyMap()
+            val empty = SeriesDetail(null, emptyMap())
             val sid = seriesId.substringBefore(".0")
-            val json = fetch("get_series_info", mapOf("series_id" to sid))
-                ?: return@withContext null to empty
+            val json = fetch("get_series_info", mapOf("series_id" to sid)) ?: return@withContext empty
             try {
                 val root = com.google.gson.JsonParser.parseString(json).asJsonObject
-                val info = root.getAsJsonObject("info")
-                val cover = jsonAsString(info?.get("cover"))
-                    ?: jsonAsString(info?.get("movie_image"))
+                val infoEl = root.get("info")
+                val info = if (infoEl != null && infoEl.isJsonObject) {
+                    gson.fromJson(infoEl, SeriesDetailInfo::class.java)
+                } else null
+
                 val episodesRoot = root.get("episodes")
                 if (episodesRoot == null || !episodesRoot.isJsonObject) {
-                    return@withContext cover to empty
+                    return@withContext SeriesDetail(info, emptyMap())
                 }
                 val unsorted = linkedMapOf<String, List<SeriesEpisode>>()
                 for ((seasonKey, seasonVal) in episodesRoot.asJsonObject.entrySet()) {
@@ -167,13 +168,15 @@ object XtreamClient {
                             ?: jsonAsString(o.getAsJsonObject("info")?.get("name"))
                             ?: ""
                         val ext = jsonAsString(o.get("container_extension")) ?: "mp4"
+                        val image = jsonAsString(o.getAsJsonObject("info")?.get("movie_image"))
                         list.add(
                             SeriesEpisode(
                                 id = id,
                                 season = seasonKey,
                                 episodeNum = epNum,
                                 title = title,
-                                ext = ext.ifBlank { "mp4" }
+                                ext = ext.ifBlank { "mp4" },
+                                image = image
                             )
                         )
                     }
@@ -184,12 +187,18 @@ object XtreamClient {
                 val sortedKeys = unsorted.keys.sortedWith(compareBy { it.toIntOrNull() ?: Int.MAX_VALUE })
                 val map = linkedMapOf<String, List<SeriesEpisode>>()
                 sortedKeys.forEach { map[it] = unsorted[it].orEmpty() }
-                cover to map
+                SeriesDetail(info, map)
             } catch (t: Throwable) {
-                android.util.Log.w("Xtream", "seriesEpisodes failed: ${t.message}")
-                null to empty
+                android.util.Log.w("Xtream", "seriesDetail failed: ${t.message}")
+                empty
             }
         }
+
+    /** @deprecated use seriesDetail */
+    suspend fun seriesEpisodes(seriesId: String): Pair<String?, Map<String, List<SeriesEpisode>>> {
+        val d = seriesDetail(seriesId)
+        return (d.info?.cover) to d.episodes
+    }
 
     private fun jsonAsString(el: com.google.gson.JsonElement?): String? {
         if (el == null || el.isJsonNull || !el.isJsonPrimitive) return null

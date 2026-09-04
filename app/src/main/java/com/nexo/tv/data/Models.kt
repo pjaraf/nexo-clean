@@ -56,12 +56,44 @@ data class SeriesItem(
     val id: String get() = seriesId?.toString()?.substringBefore(".0").orEmpty()
 }
 
+data class SeriesDetailInfo(
+    val name: String? = null,
+    val cover: String? = null,
+    val plot: String? = null,
+    val cast: String? = null,
+    val genre: String? = null,
+    @SerializedName("release_date") val releaseDate: String? = null,
+    @SerializedName("releasedate") val releaseDateAlt: String? = null,
+    val rating: Any? = null,
+    @SerializedName("backdrop_path") val backdropPath: Any? = null
+) {
+    val displayTitle: String get() = name?.trim().orEmpty()
+    val displayDate: String
+        get() = releaseDate?.trim()?.takeIf { it.isNotBlank() }
+            ?: releaseDateAlt?.trim()?.takeIf { it.isNotBlank() }
+            ?: ""
+    val ratingBadge: String
+        get() {
+            val raw = rating?.toString()?.trim().orEmpty()
+            if (raw.isBlank() || raw == "0" || raw == "0.0") return ""
+            val n = raw.replace(",", ".").toDoubleOrNull()
+            return if (n != null) n.toInt().toString() else raw.take(3)
+        }
+    val backdropUrl: String?
+        get() = when (val b = backdropPath) {
+            is List<*> -> b.firstOrNull()?.toString()?.takeIf { it.isNotBlank() }
+            is String -> b.takeIf { it.isNotBlank() }
+            else -> null
+        }
+}
+
 data class SeriesEpisode(
     val id: String,
     val season: String,
     val episodeNum: Int,
     val title: String,
-    val ext: String = "mp4"
+    val ext: String = "mp4",
+    val image: String? = null
 ) {
     val label: String
         get() {
@@ -74,3 +106,8 @@ data class SeriesEpisode(
             }
         }
 }
+
+data class SeriesDetail(
+    val info: SeriesDetailInfo?,
+    val episodes: Map<String, List<SeriesEpisode>>
+)
