@@ -67,7 +67,7 @@
             android:name=".SeriesActivity"
             android:exported="false"
             android:process=":vlc"
-            android:launchMode="singleTask"
+            android:launchMode="standard"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode"
             android:theme="@style/Theme.Nexo" />
     </application>

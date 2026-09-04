@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -145,6 +146,7 @@ class SeriesActivity : ComponentActivity() {
             }
 
             fun openRelated(item: SeriesItem) {
+                // launchMode standard: nueva Activity con el contenido de esa serie
                 startActivity(
                     Intent(this@SeriesActivity, SeriesActivity::class.java)
                         .putExtra(EXTRA_SERIES_ID, item.id)
@@ -382,17 +384,28 @@ class SeriesActivity : ComponentActivity() {
                                 .zIndex(2f)
                                 .padding(horizontal = 22.dp, vertical = 10.dp)
                         ) {
-                            // Info + preview (arriba, sin botones Volver/Favoritos)
+                            // Carátula esquina izq. arriba | info | mini player 16:9
                             Row(
                                 Modifier
                                     .weight(1.05f, fill = true)
                                     .fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.Top
                             ) {
+                                AsyncImage(
+                                    model = cover,
+                                    contentDescription = title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .width(108.dp)
+                                        .height(156.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFF222222))
+                                )
+
                                 Column(
                                     Modifier
-                                        .weight(1.15f)
+                                        .weight(1f)
                                         .fillMaxHeight(),
                                     verticalArrangement = Arrangement.Top
                                 ) {
@@ -403,9 +416,9 @@ class SeriesActivity : ComponentActivity() {
                                         Text(
                                             title,
                                             color = Color.White,
-                                            fontSize = 24.sp,
+                                            fontSize = 22.sp,
                                             fontWeight = FontWeight.Black,
-                                            maxLines = 1,
+                                            maxLines = 2,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f, fill = false)
                                         )
@@ -492,36 +505,21 @@ class SeriesActivity : ComponentActivity() {
                                     }
                                 }
 
-                                Row(
-                                    Modifier.weight(1f),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    verticalAlignment = Alignment.Top
-                                ) {
-                                    AsyncImage(
-                                        model = cover,
-                                        contentDescription = title,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .width(92.dp)
-                                            .height(132.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0xFF222222))
-                                    )
-                                    Box(
-                                        Modifier
-                                            .weight(1f)
-                                            .height(132.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color.Black.copy(alpha = 0.35f))
-                                            .onGloballyPositioned { coords ->
-                                                val pos = coords.positionInRoot()
-                                                slotX = pos.x.roundToInt()
-                                                slotY = pos.y.roundToInt()
-                                                slotW = coords.size.width
-                                                slotH = coords.size.height
-                                            }
-                                    )
-                                }
+                                // Mini player 16:9 (sin estirar)
+                                Box(
+                                    Modifier
+                                        .width(360.dp)
+                                        .aspectRatio(16f / 9f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color.Black)
+                                        .onGloballyPositioned { coords ->
+                                            val pos = coords.positionInRoot()
+                                            slotX = pos.x.roundToInt()
+                                            slotY = pos.y.roundToInt()
+                                            slotW = coords.size.width
+                                            slotH = coords.size.height
+                                        }
+                                )
                             }
 
                             Spacer(Modifier.height(8.dp))
