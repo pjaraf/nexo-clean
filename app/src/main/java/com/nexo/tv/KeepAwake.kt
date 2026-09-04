@@ -1,17 +1,16 @@
 package com.nexo.tv
 
-import android.app.Activity
 import android.content.Context
 import android.os.PowerManager
 import android.view.WindowManager
+import androidx.activity.ComponentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 
 /**
  * Evita que el TV Box entre en suspensión mientras NEXO está en primer plano.
- * Se libera al pausar/cerrar la Activity.
  */
-class KeepAwake(private val activity: Activity) : DefaultLifecycleObserver {
+class KeepAwake(private val activity: ComponentActivity) : DefaultLifecycleObserver {
     private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate(owner: LifecycleOwner) {
@@ -41,7 +40,7 @@ class KeepAwake(private val activity: Activity) : DefaultLifecycleObserver {
                 "nexo:keepawake"
             ).also {
                 it.setReferenceCounted(false)
-                it.acquire(6 * 60 * 60 * 1000L) // máx 6h; se renueva en cada onResume
+                it.acquire(6 * 60 * 60 * 1000L)
             }
         } catch (_: Throwable) {}
     }
@@ -54,6 +53,6 @@ class KeepAwake(private val activity: Activity) : DefaultLifecycleObserver {
     }
 }
 
-fun Activity.keepAwakeWhileVisible() {
+fun ComponentActivity.keepAwakeWhileVisible() {
     lifecycle.addObserver(KeepAwake(this))
 }
