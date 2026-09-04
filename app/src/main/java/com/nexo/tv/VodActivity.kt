@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,13 +50,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -82,6 +84,7 @@ class VodActivity : ComponentActivity() {
             var duration by remember { mutableLongStateOf(0L) }
             var toast by remember { mutableStateOf<String?>(null) }
             var hudTick by remember { mutableStateOf(0) }
+            val rootFocus = remember { FocusRequester() }
             val playFocus = remember { FocusRequester() }
 
             fun bumpHud() {
@@ -110,7 +113,7 @@ class VodActivity : ComponentActivity() {
 
             LaunchedEffect(hudTick) {
                 if (!showHud) return@LaunchedEffect
-                delay(4500)
+                delay(8000)
                 showHud = false
             }
 
@@ -121,9 +124,11 @@ class VodActivity : ComponentActivity() {
             }
 
             LaunchedEffect(showHud) {
+                delay(60)
                 if (showHud) {
-                    delay(80)
                     runCatching { playFocus.requestFocus() }
+                } else {
+                    runCatching { rootFocus.requestFocus() }
                 }
             }
 
@@ -135,44 +140,56 @@ class VodActivity : ComponentActivity() {
                 Modifier
                     .fillMaxSize()
                     .background(Color.Black)
+                    .focusRequester(rootFocus)
+                    .focusProperties { canFocus = !showHud }
                     .focusable()
-                    .onKeyEvent { e ->
-                        if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
-                        if (e.nativeKeyEvent.repeatCount > 0) return@onKeyEvent true
-                        when (e.nativeKeyEvent.keyCode) {
-                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                            AndroidKeyEvent.KEYCODE_ENTER,
-                            AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                                if (!showHud) {
-                                    bumpHud()
-                                } else {
-                                    engine.togglePause()
-                                    playing = engine.isPlaying
-                                    bumpHud()
+                    // Preview: solo intercepta teclas cuando el HUD está oculto
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        if (e.nativeKeyEvent.repeatCount > 0) return@onPreviewKeyEvent true
+                        val code = e.nativeKeyEvent.keyCode
+                        if (showHud) {
+                            // Con HUD visible: no robar DPAD (para moverse entre botones)
+                            // Solo teclas multimedia globales
+                            when (code) {
+                                AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                                    engine.togglePause(); playing = engine.isPlaying; bumpHud(); true
                                 }
-                                true
+                                AndroidKeyEvent.KEYCODE_MEDIA_PLAY -> {
+                                    engine.resume(); playing = true; bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                                    engine.pause(); playing = false; bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                                    engine.seekBy(10_000); bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
+                                    engine.seekBy(-10_000); bumpHud(); true
+                                }
+                                else -> false
                             }
-                            AndroidKeyEvent.KEYCODE_MEDIA_PLAY -> {
-                                engine.resume(); playing = true; bumpHud(); true
+                        } else {
+                            when (code) {
+                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                AndroidKeyEvent.KEYCODE_ENTER,
+                                AndroidKeyEvent.KEYCODE_DPAD_UP,
+                                AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+                                AndroidKeyEvent.KEYCODE_INFO,
+                                AndroidKeyEvent.KEYCODE_MENU,
+                                AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                                    bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_DPAD_LEFT,
+                                AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
+                                    engine.seekBy(-10_000); bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+                                AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                                    engine.seekBy(10_000); bumpHud(); true
+                                }
+                                else -> false
                             }
-                            AndroidKeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                                engine.pause(); playing = false; bumpHud(); true
-                            }
-                            AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-                            AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
-                                engine.seekBy(10_000); bumpHud(); true
-                            }
-                            AndroidKeyEvent.KEYCODE_MEDIA_REWIND,
-                            AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
-                                engine.seekBy(-10_000); bumpHud(); true
-                            }
-                            AndroidKeyEvent.KEYCODE_DPAD_UP,
-                            AndroidKeyEvent.KEYCODE_DPAD_DOWN,
-                            AndroidKeyEvent.KEYCODE_INFO,
-                            AndroidKeyEvent.KEYCODE_MENU -> {
-                                bumpHud(); true
-                            }
-                            else -> false
                         }
                     }
             ) {
@@ -185,10 +202,13 @@ class VodActivity : ComponentActivity() {
                             )
                             keepScreenOn = true
                             isFocusable = false
+                            isFocusableInTouchMode = false
                             engine.attach(this)
                         }
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .focusProperties { canFocus = false }
                 )
 
                 AnimatedVisibility(
@@ -200,6 +220,7 @@ class VodActivity : ComponentActivity() {
                     Column(
                         Modifier
                             .fillMaxWidth()
+                            .focusGroup()
                             .background(
                                 Brush.verticalGradient(
                                     listOf(Color.Transparent, Color(0xEE000000))
@@ -207,7 +228,9 @@ class VodActivity : ComponentActivity() {
                             )
                             .padding(horizontal = 28.dp, vertical = 22.dp)
                     ) {
-                        val progress = if (duration > 0) (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
+                        val progress = if (duration > 0) {
+                            (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+                        } else 0f
                         LinearProgressIndicator(
                             progress = { progress },
                             modifier = Modifier
@@ -224,7 +247,9 @@ class VodActivity : ComponentActivity() {
                         }
                         Spacer(Modifier.height(14.dp))
                         Row(
-                            Modifier.fillMaxWidth(),
+                            Modifier
+                                .fillMaxWidth()
+                                .focusGroup(),
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -232,8 +257,8 @@ class VodActivity : ComponentActivity() {
                                 engine.seekBy(-10_000); bumpHud()
                             }
                             HudButton(
-                                if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                if (playing) "Pausa" else "Play",
+                                icon = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                label = if (playing) "Pausa" else "Play",
                                 focusRequester = playFocus
                             ) {
                                 engine.togglePause()
@@ -292,9 +317,11 @@ private fun HudButton(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(60.dp)
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-                .onFocusChanged { isFocused = it.isFocused }
+                .onFocusChanged {
+                    isFocused = it.isFocused
+                }
                 .clip(CircleShape)
                 .background(if (isFocused) Color(0xFFDE5B17) else Color.White.copy(alpha = 0.18f))
                 .clickable(onClick = onClick)
@@ -304,7 +331,12 @@ private fun HudButton(
             Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(28.dp))
         }
         Spacer(Modifier.height(4.dp))
-        Text(label, color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
+        Text(
+            label,
+            color = if (isFocused) Color(0xFFFF6A1A) else Color.White.copy(alpha = 0.85f),
+            fontSize = 12.sp,
+            fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Normal
+        )
     }
 }
 
