@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
@@ -11,10 +12,11 @@ import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
 
 /**
- * Zapping rápido y más estable en TV Box:
- * - OSD / nombre cambia al instante (fuera de aquí)
- * - Debounce corto: solo abre el canal final
- * - stop → breve pausa → media nueva (evita SIGSEGV al reusar MediaPlayer)
+ * Zapping más rápido:
+ * - Debounce mínimo (solo si el mando dispara varias teclas)
+ * - Soft-switch (cambia media sin stop) cuando hay margen
+ * - stop + tick inmediato si el cambio es muy seguido (evita SIGSEGV)
+ * - Cache live muy bajo
  */
 class VlcEngine(context: Context) {
     private val main = Handler(Looper.getMainLooper())
@@ -31,6 +33,7 @@ class VlcEngine(context: Context) {
     private var gen = 0
     private var released = false
     private var lastUrl: String? = null
+    private var lastOpenAt = 0L
 
     init {
         player.setEventListener { ev ->
@@ -61,7 +64,6 @@ class VlcEngine(context: Context) {
         applyForce169()
     }
 
-    /** Estira canales 4:3 (y cualquier otro) a pantalla 16:9 sin bandas negras. */
     private fun applyForce169() {
         if (released) return
         try {
@@ -70,12 +72,9 @@ class VlcEngine(context: Context) {
             try {
                 player.setAspectRatio("16:9")
                 player.setScale(0f)
-            } catch (e: Throwable) {
-                Log.w(TAG, "force 16:9 failed: ${e.message}")
-            }
+            } catch (_: Throwable) {}
         }
         try {
-            // Refuerzo: trata el video como 16:9 al renderizar
             player.setAspectRatio("16:9")
             player.setScale(0f)
         } catch (_: Throwable) {}
@@ -107,19 +106,26 @@ class VlcEngine(context: Context) {
     }
 
     private fun prepareSwitch(url: String, myGen: Int) {
-        try {
-            if (player.isPlaying) player.stop()
-        } catch (_: Throwable) {}
+        val now = SystemClock.uptimeMillis()
+        val gap = now - lastOpenAt
+        // Soft: sin stop si el último cambio no fue hace milisegundos (más rápido)
+        val useSoft = gap >= SOFT_MIN_GAP_MS
+        if (!useSoft) {
+            try {
+                if (player.isPlaying) player.stop()
+            } catch (_: Throwable) {}
+        }
         val open = Runnable {
             if (released || myGen != gen) return@Runnable
             openMedia(url)
         }
         openRunnable = open
-        main.postDelayed(open, STOP_SETTLE_MS)
+        if (useSoft) main.post(open) else main.postDelayed(open, STOP_SETTLE_MS)
     }
 
     private fun openMedia(url: String) {
         if (released) return
+        lastOpenAt = SystemClock.uptimeMillis()
         try {
             val media = Media(lib, Uri.parse(url)).apply {
                 try { setHWDecoderEnabled(true, false) } catch (_: Throwable) {}
@@ -130,6 +136,7 @@ class VlcEngine(context: Context) {
                 addOption(":clock-jitter=0")
                 addOption(":clock-synchro=0")
                 addOption(":http-reconnect")
+                addOption(":no-audio-time-stretch")
             }
             player.media = media
             media.release()
@@ -156,9 +163,10 @@ class VlcEngine(context: Context) {
 
     companion object {
         private const val TAG = "VlcEngine"
-        private const val ZAP_DEBOUNCE_MS = 70L
-        private const val STOP_SETTLE_MS = 60L
-        private const val LIVE_CACHE_MS = 100
+        private const val ZAP_DEBOUNCE_MS = 30L
+        private const val STOP_SETTLE_MS = 20L
+        private const val SOFT_MIN_GAP_MS = 350L
+        private const val LIVE_CACHE_MS = 50
 
         private fun createLib(ctx: Context): LibVLC {
             val tries = listOf(
