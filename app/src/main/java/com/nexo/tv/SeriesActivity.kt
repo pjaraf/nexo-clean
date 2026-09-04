@@ -1,5 +1,6 @@
 package com.nexo.tv
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.ViewGroup
@@ -32,10 +33,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AspectRatio
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -80,9 +78,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
-import com.nexo.tv.data.Favorites
 import com.nexo.tv.data.SeriesDetailInfo
 import com.nexo.tv.data.SeriesEpisode
+import com.nexo.tv.data.SeriesItem
 import com.nexo.tv.data.XtreamClient
 import com.nexo.tv.player.StreamBridge
 import com.nexo.tv.player.VlcEngine
@@ -106,6 +104,7 @@ class SeriesActivity : ComponentActivity() {
         val seriesId = intent.getStringExtra(EXTRA_SERIES_ID).orEmpty()
         val seriesName = intent.getStringExtra(EXTRA_SERIES_NAME).orEmpty()
         val seriesCoverExtra = intent.getStringExtra(EXTRA_SERIES_COVER).orEmpty()
+        val categoryIdExtra = intent.getStringExtra(EXTRA_CATEGORY_ID).orEmpty()
 
         StreamBridge.start()
         val engine = VlcEngine(this)
@@ -116,7 +115,7 @@ class SeriesActivity : ComponentActivity() {
             var seasons by remember { mutableStateOf<Map<String, List<SeriesEpisode>>>(emptyMap()) }
             var selectedSeason by remember { mutableStateOf<String?>(null) }
             var selectedEpisode by remember { mutableStateOf<SeriesEpisode?>(null) }
-            var favorite by remember { mutableStateOf(Favorites.isSeriesFavorite(this, seriesId)) }
+            var recommended by remember { mutableStateOf<List<SeriesItem>>(emptyList()) }
             var error by remember { mutableStateOf<String?>(null) }
             var fullScreen by remember { mutableStateOf(false) }
             var playing by remember { mutableStateOf(true) }
@@ -145,6 +144,20 @@ class SeriesActivity : ComponentActivity() {
                 if (expand) fullScreen = true
             }
 
+            fun openRelated(item: SeriesItem) {
+                startActivity(
+                    Intent(this@SeriesActivity, SeriesActivity::class.java)
+                        .putExtra(EXTRA_SERIES_ID, item.id)
+                        .putExtra(EXTRA_SERIES_NAME, item.name)
+                        .putExtra(EXTRA_SERIES_COVER, item.cover.orEmpty())
+                        .putExtra(EXTRA_CATEGORY_ID, item.categoryId.orEmpty())
+                        .putExtra(EXTRA_USER, Session.username)
+                        .putExtra(EXTRA_PASS, Session.password)
+                        .putExtra(EXTRA_SERVER, Session.server)
+                )
+                finish()
+            }
+
             DisposableEffect(engine) {
                 engine.onPlaying = {
                     playing = true
@@ -168,6 +181,28 @@ class SeriesActivity : ComponentActivity() {
                 } else if (firstEp != null) {
                     playEpisode(firstEp, expand = false)
                 }
+
+                val all = runCatching { XtreamClient.series() }.getOrDefault(emptyList())
+                    .filter { it.id.isNotBlank() && it.id != seriesId }
+                val genreTokens = detail.info?.genre.orEmpty()
+                    .lowercase()
+                    .split(',', '|', '/', ';')
+                    .map { it.trim() }
+                    .filter { it.length > 2 }
+                val byCategory = if (categoryIdExtra.isNotBlank()) {
+                    all.filter { it.categoryId == categoryIdExtra }
+                } else emptyList()
+                val byGenre = if (genreTokens.isNotEmpty()) {
+                    all.filter { s ->
+                        val g = (s.genre ?: "").lowercase()
+                        val n = s.name.lowercase()
+                        genreTokens.any { t -> g.contains(t) || n.contains(t) }
+                    }
+                } else emptyList()
+                recommended = (byCategory + byGenre + all)
+                    .distinctBy { it.id }
+                    .take(14)
+
                 loading = false
             }
 
@@ -339,55 +374,36 @@ class SeriesActivity : ComponentActivity() {
                             Modifier.fillMaxSize().zIndex(2f),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(error!!, color = Color.White, fontSize = 16.sp)
-                                Spacer(Modifier.height(16.dp))
-                                OutlineChip("Volver", Icons.AutoMirrored.Filled.ArrowBack) { finish() }
-                            }
+                            Text(error!!, color = Color.White, fontSize = 16.sp)
                         }
                         else -> Column(
                             Modifier
                                 .fillMaxSize()
                                 .zIndex(2f)
-                                .padding(horizontal = 28.dp, vertical = 16.dp)
+                                .padding(horizontal = 22.dp, vertical = 10.dp)
                         ) {
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlineChip("Volver", Icons.AutoMirrored.Filled.ArrowBack) { finish() }
-                                OutlineChip(
-                                    if (favorite) "En Favoritos" else "Añadir a Favoritos",
-                                    if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder
-                                ) {
-                                    favorite = Favorites.toggleSeries(this@SeriesActivity, seriesId)
-                                }
-                            }
-
-                            Spacer(Modifier.height(10.dp))
-
+                            // Info + preview (arriba, sin botones Volver/Favoritos)
                             Row(
                                 Modifier
-                                    .weight(1f)
+                                    .weight(1.05f, fill = true)
                                     .fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                verticalAlignment = Alignment.Top
                             ) {
                                 Column(
                                     Modifier
                                         .weight(1.15f)
                                         .fillMaxHeight(),
-                                    verticalArrangement = Arrangement.Center
+                                    verticalArrangement = Arrangement.Top
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Text(
                                             title,
                                             color = Color.White,
-                                            fontSize = 28.sp,
+                                            fontSize = 24.sp,
                                             fontWeight = FontWeight.Black,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
@@ -398,70 +414,70 @@ class SeriesActivity : ComponentActivity() {
                                                 Modifier
                                                     .clip(RoundedCornerShape(6.dp))
                                                     .background(SeriesRating)
-                                                    .padding(horizontal = 7.dp, vertical = 2.dp)
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
                                                     rating,
                                                     color = Color.White,
-                                                    fontSize = 13.sp,
+                                                    fontSize = 12.sp,
                                                     fontWeight = FontWeight.Black
                                                 )
                                             }
                                         }
                                     }
-                                    Spacer(Modifier.height(4.dp))
+                                    Spacer(Modifier.height(3.dp))
                                     Text(
                                         dateLine,
                                         color = Color.White.copy(alpha = 0.65f),
-                                        fontSize = 12.sp,
+                                        fontSize = 11.sp,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     if (epTag.isNotBlank()) {
-                                        Spacer(Modifier.height(6.dp))
+                                        Spacer(Modifier.height(4.dp))
                                         Text(
                                             epTag,
                                             color = SeriesAmber,
-                                            fontSize = 14.sp,
+                                            fontSize = 13.sp,
                                             fontWeight = FontWeight.Black
                                         )
                                     }
-                                    Spacer(Modifier.height(6.dp))
+                                    Spacer(Modifier.height(4.dp))
                                     Row {
                                         Text(
                                             "Actores: ",
                                             color = Color.White,
-                                            fontSize = 12.sp,
+                                            fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
                                             castText,
                                             color = Color.White.copy(alpha = 0.8f),
-                                            fontSize = 12.sp,
+                                            fontSize = 11.sp,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                     }
-                                    Spacer(Modifier.height(4.dp))
+                                    Spacer(Modifier.height(3.dp))
                                     Row {
                                         Text(
                                             "Sinopsis: ",
                                             color = Color.White,
-                                            fontSize = 12.sp,
+                                            fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
                                             plotText,
                                             color = Color.White.copy(alpha = 0.8f),
-                                            fontSize = 12.sp,
+                                            fontSize = 11.sp,
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
-                                    Spacer(Modifier.height(14.dp))
+                                    Spacer(Modifier.height(10.dp))
                                     Row(
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         SeriesActionButton("Pantalla completa", Icons.Filled.Tv, true) {
@@ -471,32 +487,31 @@ class SeriesActivity : ComponentActivity() {
                                         SeriesActionButton("Idioma y subtítulos", Icons.Filled.Subtitles, false) {
                                             toast = engine.cycleAudioTrack()
                                                 ?: engine.cycleSubtitleTrack()
-                                                        ?: "Sin pistas"
+                                                ?: "Sin pistas"
                                         }
                                     }
                                 }
 
                                 Row(
                                     Modifier.weight(1f),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.Top
                                 ) {
                                     AsyncImage(
                                         model = cover,
                                         contentDescription = title,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
-                                            .width(110.dp)
-                                            .height(160.dp)
-                                            .clip(RoundedCornerShape(10.dp))
+                                            .width(92.dp)
+                                            .height(132.dp)
+                                            .clip(RoundedCornerShape(8.dp))
                                             .background(Color(0xFF222222))
                                     )
-                                    // Hueco transparente: aquí se posiciona el VLC miniatura
                                     Box(
                                         Modifier
                                             .weight(1f)
-                                            .height(160.dp)
-                                            .clip(RoundedCornerShape(10.dp))
+                                            .height(132.dp)
+                                            .clip(RoundedCornerShape(8.dp))
                                             .background(Color.Black.copy(alpha = 0.35f))
                                             .onGloballyPositioned { coords ->
                                                 val pos = coords.positionInRoot()
@@ -504,28 +519,25 @@ class SeriesActivity : ComponentActivity() {
                                                 slotY = pos.y.roundToInt()
                                                 slotW = coords.size.width
                                                 slotH = coords.size.height
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        // El video VLC se dibuja encima de este hueco
-                                    }
+                                            }
+                                    )
                                 }
                             }
 
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(8.dp))
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     items(seasons.keys.toList(), key = { it }) { season ->
                                         val selected = season == selectedSeason
                                         var focused by remember { mutableStateOf(false) }
                                         Box(
                                             Modifier
                                                 .onFocusChanged { focused = it.isFocused }
-                                                .clip(RoundedCornerShape(20.dp))
+                                                .clip(RoundedCornerShape(18.dp))
                                                 .background(
                                                     when {
                                                         focused || selected -> SeriesBlue
@@ -537,17 +549,17 @@ class SeriesActivity : ComponentActivity() {
                                                         if (focused) 2.dp else 1.dp,
                                                         Color.White.copy(alpha = if (focused) 0.95f else 0.2f)
                                                     ),
-                                                    RoundedCornerShape(20.dp)
+                                                    RoundedCornerShape(18.dp)
                                                 )
                                                 .clickable { selectedSeason = season }
                                                 .focusable()
-                                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                                .padding(horizontal = 12.dp, vertical = 6.dp)
                                         ) {
                                             Text(
                                                 "Temporada $season",
                                                 color = Color.White,
                                                 fontWeight = FontWeight.SemiBold,
-                                                fontSize = 13.sp
+                                                fontSize = 12.sp
                                             )
                                         }
                                     }
@@ -555,29 +567,29 @@ class SeriesActivity : ComponentActivity() {
                                 if (epRange.isNotBlank()) {
                                     Box(
                                         Modifier
-                                            .clip(RoundedCornerShape(16.dp))
+                                            .clip(RoundedCornerShape(14.dp))
                                             .background(Color.White.copy(alpha = 0.12f))
-                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                            .padding(horizontal = 10.dp, vertical = 5.dp)
                                     ) {
-                                        Text(epRange, color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
+                                        Text(epRange, color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp)
                                     }
                                 }
                             }
 
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(6.dp))
 
                             LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                contentPadding = PaddingValues(bottom = 4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                contentPadding = PaddingValues(bottom = 2.dp)
                             ) {
                                 items(episodes, key = { it.id }) { ep ->
                                     val selected = ep.id == selectedEpisode?.id
                                     var focused by remember { mutableStateOf(false) }
                                     Box(
                                         Modifier
-                                            .size(48.dp)
+                                            .size(40.dp)
                                             .onFocusChanged { focused = it.isFocused }
-                                            .clip(RoundedCornerShape(10.dp))
+                                            .clip(RoundedCornerShape(8.dp))
                                             .background(
                                                 when {
                                                     focused || selected -> SeriesBlue
@@ -589,7 +601,7 @@ class SeriesActivity : ComponentActivity() {
                                                     if (focused || selected) 2.dp else 1.dp,
                                                     Color.White.copy(alpha = if (focused || selected) 0.9f else 0.22f)
                                                 ),
-                                                RoundedCornerShape(10.dp)
+                                                RoundedCornerShape(8.dp)
                                             )
                                             .clickable { playEpisode(ep) }
                                             .focusable(),
@@ -601,13 +613,13 @@ class SeriesActivity : ComponentActivity() {
                                                     Icons.Filled.PlayArrow,
                                                     null,
                                                     tint = Color.White,
-                                                    modifier = Modifier.size(14.dp)
+                                                    modifier = Modifier.size(12.dp)
                                                 )
                                                 Text(
                                                     "${ep.episodeNum}",
                                                     color = Color.White,
                                                     fontWeight = FontWeight.Bold,
-                                                    fontSize = 14.sp
+                                                    fontSize = 12.sp
                                                 )
                                             }
                                         } else {
@@ -615,9 +627,48 @@ class SeriesActivity : ComponentActivity() {
                                                 "${ep.episodeNum}",
                                                 color = Color.White,
                                                 fontWeight = FontWeight.SemiBold,
-                                                fontSize = 15.sp
+                                                fontSize = 13.sp
                                             )
                                         }
+                                    }
+                                }
+                            }
+
+                            if (recommended.isNotEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Recomendadas",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    contentPadding = PaddingValues(bottom = 2.dp)
+                                ) {
+                                    items(recommended, key = { it.id }) { item ->
+                                        var focused by remember { mutableStateOf(false) }
+                                        AsyncImage(
+                                            model = item.cover,
+                                            contentDescription = item.name,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .width(72.dp)
+                                                .height(102.dp)
+                                                .onFocusChanged { focused = it.isFocused }
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .border(
+                                                    BorderStroke(
+                                                        if (focused) 2.dp else 0.dp,
+                                                        if (focused) SeriesBlue else Color.Transparent
+                                                    ),
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .background(Color(0xFF222222))
+                                                .clickable { openRelated(item) }
+                                                .focusable()
+                                        )
                                     }
                                 }
                             }
@@ -742,6 +793,7 @@ class SeriesActivity : ComponentActivity() {
         const val EXTRA_SERIES_ID = "series_id"
         const val EXTRA_SERIES_NAME = "series_name"
         const val EXTRA_SERIES_COVER = "series_cover"
+        const val EXTRA_CATEGORY_ID = "category_id"
         const val EXTRA_USER = "user"
         const val EXTRA_PASS = "pass"
         const val EXTRA_SERVER = "server"
@@ -751,29 +803,6 @@ class SeriesActivity : ComponentActivity() {
 private val SeriesBlue = Color(0xFF007AFF)
 private val SeriesAmber = Color(0xFFFFC107)
 private val SeriesRating = Color(0xFF00B0FF)
-
-@Composable
-private fun OutlineChip(label: String, icon: ImageVector, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    Row(
-        Modifier
-            .onFocusChanged { focused = it.isFocused }
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (focused) SeriesBlue else Color.White.copy(alpha = 0.10f))
-            .border(
-                BorderStroke(if (focused) 2.dp else 1.dp, Color.White.copy(alpha = if (focused) 0.95f else 0.35f)),
-                RoundedCornerShape(10.dp)
-            )
-            .clickable(onClick = onClick)
-            .focusable()
-            .padding(horizontal = 14.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(18.dp))
-        Text(label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
 
 @Composable
 private fun SeriesActionButton(

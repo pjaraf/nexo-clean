@@ -88,6 +88,7 @@ fun HubScreen(onLogout: () -> Unit) {
                 .putExtra(SeriesActivity.EXTRA_SERIES_ID, item.id)
                 .putExtra(SeriesActivity.EXTRA_SERIES_NAME, item.name)
                 .putExtra(SeriesActivity.EXTRA_SERIES_COVER, item.cover.orEmpty())
+                .putExtra(SeriesActivity.EXTRA_CATEGORY_ID, item.categoryId.orEmpty())
                 .putExtra(SeriesActivity.EXTRA_USER, Session.username)
                 .putExtra(SeriesActivity.EXTRA_PASS, Session.password)
                 .putExtra(SeriesActivity.EXTRA_SERVER, Session.server)

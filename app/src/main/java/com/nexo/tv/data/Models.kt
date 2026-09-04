@@ -51,7 +51,9 @@ data class VodItem(
 data class SeriesItem(
     @SerializedName("series_id") val seriesId: Any? = null,
     val name: String = "",
-    val cover: String? = null
+    val cover: String? = null,
+    @SerializedName("category_id") val categoryId: String? = null,
+    val genre: String? = null
 ) {
     val id: String get() = seriesId?.toString()?.substringBefore(".0").orEmpty()
 }
