@@ -41,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -59,7 +58,8 @@ import com.nexo.tv.data.VodItem
 import com.nexo.tv.data.XtreamClient
 
 private val Orange = Color(0xFFDE5B17)
-private val Bg = Color(0xFF0D0D0D)
+private val PosterW = 132.dp
+private val PosterH = 188.dp
 
 private enum class Tab { HOME, TV, SERIES, MOVIES }
 
@@ -70,8 +70,10 @@ fun HubScreen(onLogout: () -> Unit) {
     val movies = Catalog.movies
     val series = Catalog.series
 
-    Box(Modifier.fillMaxSize().background(Bg)) {
-        // Contenido a pantalla completa (sin panel lateral)
+    Box(Modifier.fillMaxSize()) {
+        // Fondo cinematográfico en todas las pestañas
+        LoginBackdrop()
+
         Box(Modifier.fillMaxSize()) {
             when (tab) {
                 Tab.HOME -> HomePane(
@@ -84,10 +86,18 @@ fun HubScreen(onLogout: () -> Unit) {
                         )
                     }
                 )
-                Tab.SERIES -> Box(Modifier.padding(start = 88.dp, top = 24.dp, end = 24.dp, bottom = 24.dp).fillMaxSize()) {
+                Tab.SERIES -> Box(
+                    Modifier
+                        .padding(start = 88.dp, top = 24.dp, end = 24.dp, bottom = 24.dp)
+                        .fillMaxSize()
+                ) {
                     PosterGrid(items = series.map { it.id to (it.cover to it.name) })
                 }
-                Tab.MOVIES -> Box(Modifier.padding(start = 88.dp, top = 24.dp, end = 24.dp, bottom = 24.dp).fillMaxSize()) {
+                Tab.MOVIES -> Box(
+                    Modifier
+                        .padding(start = 88.dp, top = 24.dp, end = 24.dp, bottom = 24.dp)
+                        .fillMaxSize()
+                ) {
                     PosterGrid(
                         items = movies.map { it.id to (it.streamIcon to it.name) },
                         onClick = { id ->
@@ -104,7 +114,6 @@ fun HubScreen(onLogout: () -> Unit) {
             }
         }
 
-        // Botones flotantes a la izquierda (sin fondo de barra)
         Column(
             Modifier
                 .align(Alignment.CenterStart)
@@ -172,72 +181,40 @@ private fun HomePane(
     onMovie: (VodItem) -> Unit
 ) {
     var featured by remember(movies) { mutableStateOf(movies.firstOrNull()) }
-    val cover = featured?.streamIcon
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF070707))) {
-        // Carátula grande a la derecha, bien visible (sin estirar mal)
-        AsyncImage(
-            model = cover,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.Center,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .fillMaxWidth(0.58f)
-        )
-        // Degradado suave solo a la izquierda para leer el texto; la carátula queda clara
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        0.0f to Color(0xFF070707),
-                        0.28f to Color(0xE6070707),
-                        0.52f to Color(0x66070707),
-                        0.72f to Color(0x14000000),
-                        1.0f to Color.Transparent
-                    )
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(start = 88.dp, end = 20.dp, top = 26.dp, bottom = 14.dp)
+    ) {
+        Text("NEXO", color = Orange, fontSize = 32.sp, fontWeight = FontWeight.Black)
+        Spacer(Modifier.height(22.dp))
+
+        featured?.let { movie ->
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Misma proporción/tamaño que el resto de carátulas
+                Poster(
+                    url = movie.streamIcon,
+                    title = movie.name,
+                    modifier = Modifier
+                        .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
+                        .clickable { onMovie(movie) }
+                        .focusable()
                 )
-        )
-        // Degradado abajo para la fila de películas
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(280.dp)
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        0.35f to Color(0xCC070707),
-                        1f to Color(0xF2070707)
-                    )
-                )
-        )
-
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(start = 88.dp, end = 20.dp, top = 26.dp, bottom = 14.dp)
-        ) {
-            Text("NEXO", color = Orange, fontSize = 32.sp, fontWeight = FontWeight.Black)
-
-            featured?.let { movie ->
-                Column(
-                    Modifier
-                        .padding(top = 28.dp)
-                        .fillMaxWidth(0.42f)
-                        .weight(1f)
-                ) {
+                Spacer(Modifier.width(22.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
                         text = movie.name,
                         color = Color.White,
-                        fontSize = 36.sp,
+                        fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(16.dp))
                     Row(
                         Modifier
                             .tvFocus(shape = RoundedCornerShape(12.dp), focusedScale = 1.04f)
@@ -253,25 +230,26 @@ private fun HomePane(
                         Text("Reproducir", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                     }
                 }
-            } ?: Spacer(Modifier.weight(1f))
+            }
+        }
 
-            Text("Películas", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(8.dp))
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(movies, key = { it.id }) { m ->
-                    Poster(
-                        url = m.streamIcon,
-                        title = m.name,
-                        modifier = Modifier
-                            .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
-                            .onFocusChanged { if (it.isFocused) featured = m }
-                            .clickable { onMovie(m) }
-                            .focusable()
-                    )
-                }
+        Spacer(Modifier.weight(1f))
+        Text("Películas", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            items(movies, key = { it.id }) { m ->
+                Poster(
+                    url = m.streamIcon,
+                    title = m.name,
+                    modifier = Modifier
+                        .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
+                        .onFocusChanged { if (it.isFocused) featured = m }
+                        .clickable { onMovie(m) }
+                        .focusable()
+                )
             }
         }
     }
@@ -303,24 +281,15 @@ private fun PosterGrid(
 
 @Composable
 private fun Poster(url: String?, title: String, modifier: Modifier = Modifier) {
-    Column(modifier.width(132.dp)) {
-        AsyncImage(
-            model = url,
-            contentDescription = title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .height(188.dp)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF222222))
-        )
-        Text(
-            title,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(top = 6.dp)
-        )
-    }
+    // Solo carátula — sin nombre debajo
+    AsyncImage(
+        model = url,
+        contentDescription = title,
+        contentScale = ContentScale.Crop,
+        modifier = modifier
+            .width(PosterW)
+            .height(PosterH)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFF222222))
+    )
 }
