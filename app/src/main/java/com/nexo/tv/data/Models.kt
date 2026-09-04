@@ -33,7 +33,9 @@ data class VodItem(
     @SerializedName("container_extension") val ext: String? = "mp4",
     val year: String? = null,
     @SerializedName("releasedate") val releaseDate: String? = null,
-    @SerializedName("added") val added: String? = null
+    @SerializedName("added") val added: String? = null,
+    @SerializedName("category_id") val categoryId: String? = null,
+    val genre: String? = null
 ) {
     val id: String get() = streamId?.toString()?.substringBefore(".0").orEmpty()
     val displayName: String get() = name?.trim().orEmpty()
@@ -61,6 +63,8 @@ data class SeriesItem(
 data class SeriesDetailInfo(
     val name: String? = null,
     val cover: String? = null,
+    @SerializedName("movie_image") val movieImage: String? = null,
+    @SerializedName("cover_big") val coverBig: String? = null,
     val plot: String? = null,
     val cast: String? = null,
     val genre: String? = null,
@@ -70,6 +74,10 @@ data class SeriesDetailInfo(
     @SerializedName("backdrop_path") val backdropPath: Any? = null
 ) {
     val displayTitle: String get() = name?.trim().orEmpty()
+    val posterUrl: String?
+        get() = cover?.takeIf { it.isNotBlank() }
+            ?: movieImage?.takeIf { it.isNotBlank() }
+            ?: coverBig?.takeIf { it.isNotBlank() }
     val displayDate: String
         get() = releaseDate?.trim()?.takeIf { it.isNotBlank() }
             ?: releaseDateAlt?.trim()?.takeIf { it.isNotBlank() }
@@ -86,7 +94,7 @@ data class SeriesDetailInfo(
             is List<*> -> b.firstOrNull()?.toString()?.takeIf { it.isNotBlank() }
             is String -> b.takeIf { it.isNotBlank() }
             else -> null
-        }
+        } ?: posterUrl
 }
 
 data class SeriesEpisode(

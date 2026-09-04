@@ -197,8 +197,32 @@ object XtreamClient {
     /** @deprecated use seriesDetail */
     suspend fun seriesEpisodes(seriesId: String): Pair<String?, Map<String, List<SeriesEpisode>>> {
         val d = seriesDetail(seriesId)
-        return (d.info?.cover) to d.episodes
+        return (d.info?.posterUrl) to d.episodes
     }
+
+    /**
+     * Detalle de película: info (sinopsis, actores, cover) + extensión del contenedor.
+     */
+    suspend fun movieDetail(vodId: String): Pair<SeriesDetailInfo?, String> =
+        withContext(Dispatchers.IO) {
+            val sid = vodId.substringBefore(".0")
+            val json = fetch("get_vod_info", mapOf("vod_id" to sid))
+                ?: return@withContext null to "mp4"
+            try {
+                val root = com.google.gson.JsonParser.parseString(json).asJsonObject
+                val infoEl = root.get("info")
+                val info = if (infoEl != null && infoEl.isJsonObject) {
+                    gson.fromJson(infoEl, SeriesDetailInfo::class.java)
+                } else null
+                val movieData = root.get("movie_data")
+                val ext = if (movieData != null && movieData.isJsonObject) {
+                    movieData.asJsonObject.get("container_extension")?.asString?.trim()?.ifBlank { null }
+                } else null
+                info to (ext ?: "mp4")
+            } catch (_: Exception) {
+                null to "mp4"
+            }
+        }
 
     private fun jsonAsString(el: com.google.gson.JsonElement?): String? {
         if (el == null || el.isJsonNull || !el.isJsonPrimitive) return null

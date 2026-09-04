@@ -80,10 +80,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
+import com.nexo.tv.data.Catalog
 import com.nexo.tv.data.ContinueWatching
 import com.nexo.tv.data.SeriesDetailInfo
-import com.nexo.tv.data.SeriesEpisode
-import com.nexo.tv.data.SeriesItem
+import com.nexo.tv.data.VodItem
 import com.nexo.tv.data.XtreamClient
 import com.nexo.tv.player.StreamBridge
 import com.nexo.tv.player.VlcEngine
@@ -93,10 +93,10 @@ import org.videolan.libvlc.util.VLCVideoLayout
 import kotlin.math.roundToInt
 
 /**
- * Detalle de serie + preview VLC. "Pantalla completa" expande el mismo motor
- * (sin segunda reproducción).
+ * Detalle de película + preview VLC (misma UX que series).
+ * "Pantalla completa" expande el mismo motor.
  */
-class SeriesActivity : ComponentActivity() {
+class MovieActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -105,11 +105,11 @@ class SeriesActivity : ComponentActivity() {
         intent.getStringExtra(EXTRA_PASS)?.let { Session.password = it }
         intent.getStringExtra(EXTRA_SERVER)?.let { if (it.isNotBlank()) Session.server = it }
 
-        val seriesId = intent.getStringExtra(EXTRA_SERIES_ID).orEmpty()
-        val seriesName = intent.getStringExtra(EXTRA_SERIES_NAME).orEmpty()
-        val seriesCoverExtra = intent.getStringExtra(EXTRA_SERIES_COVER).orEmpty()
+        val movieId = intent.getStringExtra(EXTRA_MOVIE_ID).orEmpty()
+        val movieName = intent.getStringExtra(EXTRA_MOVIE_NAME).orEmpty()
+        val movieCoverExtra = intent.getStringExtra(EXTRA_MOVIE_COVER).orEmpty()
         val categoryIdExtra = intent.getStringExtra(EXTRA_CATEGORY_ID).orEmpty()
-        val resumeEpisodeId = intent.getStringExtra(EXTRA_RESUME_EPISODE_ID).orEmpty()
+        val extExtra = intent.getStringExtra(EXTRA_EXT)?.ifBlank { null } ?: "mp4"
         val resumeFromIntent = intent.getLongExtra(EXTRA_RESUME_MS, -1L)
 
         StreamBridge.start()
@@ -118,17 +118,14 @@ class SeriesActivity : ComponentActivity() {
         setContent {
             var loading by remember { mutableStateOf(true) }
             var info by remember { mutableStateOf<SeriesDetailInfo?>(null) }
-            var seasons by remember { mutableStateOf<Map<String, List<SeriesEpisode>>>(emptyMap()) }
-            var selectedSeason by remember { mutableStateOf<String?>(null) }
-            var selectedEpisode by remember { mutableStateOf<SeriesEpisode?>(null) }
-            var recommended by remember { mutableStateOf<List<SeriesItem>>(emptyList()) }
+            var containerExt by remember { mutableStateOf(extExtra) }
+            var recommended by remember { mutableStateOf<List<VodItem>>(emptyList()) }
             var error by remember { mutableStateOf<String?>(null) }
             var fullScreen by remember { mutableStateOf(false) }
             var playing by remember { mutableStateOf(true) }
             var position by remember { mutableLongStateOf(0L) }
             var duration by remember { mutableLongStateOf(0L) }
             var toast by remember { mutableStateOf<String?>(null) }
-            var nextEpisodeMsg by remember { mutableStateOf(false) }
             var hudVisible by remember { mutableStateOf(true) }
             var hudTick by remember { mutableIntStateOf(0) }
             var slotX by remember { mutableIntStateOf(0) }
@@ -136,7 +133,6 @@ class SeriesActivity : ComponentActivity() {
             var slotW by remember { mutableIntStateOf(0) }
             var slotH by remember { mutableIntStateOf(0) }
             var pendingResume by remember { mutableLongStateOf(0L) }
-            var autoNextArmed by remember { mutableStateOf(true) }
             var showResumePrompt by remember { mutableStateOf(false) }
             var resumeChoiceMs by remember { mutableLongStateOf(0L) }
             var expandAfterChoice by remember { mutableStateOf(false) }
@@ -150,33 +146,26 @@ class SeriesActivity : ComponentActivity() {
             }
 
             fun persistProgress() {
-                val ep = selectedEpisode ?: return
-                if (seriesId.isBlank()) return
+                if (movieId.isBlank()) return
                 ContinueWatching.save(
-                    this@SeriesActivity,
+                    this@MovieActivity,
                     ContinueWatching.Item(
-                        kind = "series",
-                        id = seriesId,
-                        title = (info?.displayTitle?.takeIf { it.isNotBlank() } ?: seriesName)
-                            .ifBlank { "Serie" },
-                        poster = (info?.posterUrl ?: seriesCoverExtra).ifBlank { null },
+                        kind = "movie",
+                        id = movieId,
+                        title = (info?.displayTitle?.takeIf { it.isNotBlank() } ?: movieName)
+                            .ifBlank { "Película" },
+                        poster = (info?.posterUrl ?: movieCoverExtra).ifBlank { null },
                         positionMs = engine.timeMs(),
                         durationMs = engine.lengthMs().coerceAtLeast(duration),
-                        episodeId = ep.id,
-                        episodeExt = ep.ext,
-                        season = ep.season,
-                        episodeNum = ep.episodeNum,
+                        url = XtreamClient.movieUrl(movieId, containerExt),
                         categoryId = categoryIdExtra.ifBlank { null }
                     )
                 )
             }
 
-            fun playEpisode(ep: SeriesEpisode, expand: Boolean = false, resumeMs: Long = 0L) {
-                selectedEpisode = ep
-                selectedSeason = ep.season
-                autoNextArmed = true
+            fun playMovie(resumeMs: Long = 0L, expand: Boolean = false) {
                 pendingResume = resumeMs
-                val url = StreamBridge.maybeWrap(XtreamClient.seriesUrl(ep.id, ep.ext))
+                val url = StreamBridge.maybeWrap(XtreamClient.movieUrl(movieId, containerExt))
                 engine.playVod(url)
                 playing = true
                 if (expand) fullScreen = true
@@ -199,16 +188,9 @@ class SeriesActivity : ComponentActivity() {
 
             fun requestFullscreen() {
                 if (showResumePrompt) return
-                val saved = ContinueWatching.get(this@SeriesActivity, "series", seriesId)
-                val ep = selectedEpisode
+                val saved = ContinueWatching.get(this@MovieActivity, "movie", movieId)
                 val atStart = engine.timeMs() < 15_000L
-                if (
-                    ep != null &&
-                    saved != null &&
-                    saved.episodeId == ep.id &&
-                    saved.positionMs > 20_000L &&
-                    atStart
-                ) {
+                if (saved != null && saved.positionMs > 20_000L && atStart) {
                     resumeChoiceMs = saved.positionMs
                     expandAfterChoice = true
                     showResumePrompt = true
@@ -220,38 +202,15 @@ class SeriesActivity : ComponentActivity() {
                 }
             }
 
-            fun nextEpisode(): SeriesEpisode? {
-                val keys = seasons.keys.toList()
-                val season = selectedSeason ?: return null
-                val eps = seasons[season].orEmpty()
-                val idx = eps.indexOfFirst { it.id == selectedEpisode?.id }
-                if (idx >= 0 && idx + 1 < eps.size) return eps[idx + 1]
-                val sIdx = keys.indexOf(season)
-                if (sIdx >= 0 && sIdx + 1 < keys.size) {
-                    return seasons[keys[sIdx + 1]]?.firstOrNull()
-                }
-                return null
-            }
-
-            fun goNextEpisode() {
-                if (!autoNextArmed) return
-                val next = nextEpisode() ?: return
-                autoNextArmed = false
-                nextEpisodeMsg = true
-                toast = "Cargando siguiente episodio…"
-                playEpisode(next, expand = true)
-            }
-
-            val goNextRef = rememberUpdatedState(newValue = { goNextEpisode() })
-
-            fun openRelated(item: SeriesItem) {
+            fun openRelated(item: VodItem) {
                 persistProgress()
                 startActivity(
-                    Intent(this@SeriesActivity, SeriesActivity::class.java)
-                        .putExtra(EXTRA_SERIES_ID, item.id)
-                        .putExtra(EXTRA_SERIES_NAME, item.name)
-                        .putExtra(EXTRA_SERIES_COVER, item.cover.orEmpty())
+                    Intent(this@MovieActivity, MovieActivity::class.java)
+                        .putExtra(EXTRA_MOVIE_ID, item.id)
+                        .putExtra(EXTRA_MOVIE_NAME, item.displayName)
+                        .putExtra(EXTRA_MOVIE_COVER, item.streamIcon.orEmpty())
                         .putExtra(EXTRA_CATEGORY_ID, item.categoryId.orEmpty())
+                        .putExtra(EXTRA_EXT, item.ext ?: "mp4")
                         .putExtra(EXTRA_USER, Session.username)
                         .putExtra(EXTRA_PASS, Session.password)
                         .putExtra(EXTRA_SERVER, Session.server)
@@ -263,7 +222,6 @@ class SeriesActivity : ComponentActivity() {
                 engine.onPlaying = {
                     playing = true
                     duration = engine.lengthMs()
-                    nextEpisodeMsg = false
                     if (promptShowing.value) {
                         engine.pause()
                         playing = false
@@ -273,73 +231,54 @@ class SeriesActivity : ComponentActivity() {
                         engine.seekTo(seek)
                     }
                 }
-                engine.onEnded = { goNextRef.value.invoke() }
                 onDispose {
                     persistProgress()
                     engine.release()
                 }
             }
 
-            LaunchedEffect(seriesId) {
+            LaunchedEffect(movieId) {
                 loading = true
                 error = null
-                nextEpisodeMsg = false
-                val detail = XtreamClient.seriesDetail(seriesId)
-                info = detail.info
-                seasons = detail.episodes
-                val saved = ContinueWatching.get(this@SeriesActivity, "series", seriesId)
-                val wantEpId = resumeEpisodeId.ifBlank { saved?.episodeId.orEmpty() }
+                if (movieId.isBlank()) {
+                    error = "Película no válida"
+                    loading = false
+                    return@LaunchedEffect
+                }
+                val (detail, ext) = XtreamClient.movieDetail(movieId)
+                info = detail
+                containerExt = ext.ifBlank { extExtra }
+                val saved = ContinueWatching.get(this@MovieActivity, "movie", movieId)
                 val wantResume = when {
                     resumeFromIntent > 0L -> resumeFromIntent
-                    !saved?.episodeId.isNullOrBlank() && saved?.episodeId == wantEpId ->
-                        saved?.positionMs ?: 0L
+                    saved != null && saved.positionMs > 0L -> saved.positionMs
                     else -> 0L
                 }
-
-                var startEp: SeriesEpisode? = null
-                if (wantEpId.isNotBlank()) {
-                    for ((season, eps) in detail.episodes) {
-                        val found = eps.firstOrNull { it.id == wantEpId }
-                        if (found != null) {
-                            selectedSeason = season
-                            startEp = found
-                            break
-                        }
-                    }
-                }
-                if (startEp == null) {
-                    val first = detail.episodes.keys.firstOrNull()
-                    selectedSeason = first
-                    startEp = first?.let { detail.episodes[it]?.firstOrNull() }
-                }
-                selectedEpisode = startEp
-                if (detail.episodes.isEmpty()) {
-                    error = "No se encontraron episodios"
-                } else if (startEp != null) {
-                    if (wantResume > 20_000L) {
-                        resumeChoiceMs = wantResume
-                        expandAfterChoice = resumeFromIntent > 0L
-                        showResumePrompt = true
-                        playEpisode(startEp, expand = false, resumeMs = 0L)
-                    } else {
-                        playEpisode(startEp, expand = false, resumeMs = wantResume)
-                    }
+                if (wantResume > 20_000L) {
+                    resumeChoiceMs = wantResume
+                    expandAfterChoice = resumeFromIntent > 0L
+                    showResumePrompt = true
+                    playMovie(resumeMs = 0L)
+                } else {
+                    playMovie(resumeMs = wantResume)
                 }
 
-                val all = runCatching { XtreamClient.series() }.getOrDefault(emptyList())
-                    .filter { it.id.isNotBlank() && it.id != seriesId }
-                val genreTokens = detail.info?.genre.orEmpty()
+                val all = Catalog.movies
+                    .ifEmpty { runCatching { XtreamClient.movies() }.getOrDefault(emptyList()) }
+                    .filter { it.id.isNotBlank() && it.id != movieId }
+                val genreTokens = detail?.genre.orEmpty()
                     .lowercase()
                     .split(',', '|', '/', ';')
                     .map { it.trim() }
                     .filter { it.length > 2 }
-                val byCategory = if (categoryIdExtra.isNotBlank()) {
-                    all.filter { it.categoryId == categoryIdExtra }
+                val cat = categoryIdExtra.ifBlank { null }
+                val byCategory = if (!cat.isNullOrBlank()) {
+                    all.filter { it.categoryId == cat }
                 } else emptyList()
                 val byGenre = if (genreTokens.isNotEmpty()) {
-                    all.filter { s ->
-                        val g = (s.genre ?: "").lowercase()
-                        val n = s.name.lowercase()
+                    all.filter { m ->
+                        val g = (m.genre ?: "").lowercase()
+                        val n = m.displayName.lowercase()
                         genreTokens.any { t -> g.contains(t) || n.contains(t) }
                     }
                 } else emptyList()
@@ -350,23 +289,12 @@ class SeriesActivity : ComponentActivity() {
                 loading = false
             }
 
-            val episodes = selectedSeason?.let { seasons[it] }.orEmpty()
-            LaunchedEffect(selectedSeason, episodes) {
-                if (selectedEpisode == null || episodes.none { it.id == selectedEpisode?.id }) {
-                    episodes.firstOrNull()?.let { playEpisode(it) }
-                }
-            }
-
             LaunchedEffect(Unit) {
                 while (true) {
                     position = engine.timeMs()
                     val len = engine.lengthMs()
                     if (len > 0) duration = len
                     playing = engine.isPlaying
-                    // Backup si EndReached no dispara
-                    if (autoNextArmed && len > 30_000L && position >= len - 1_200L && position > 0L) {
-                        goNextEpisode()
-                    }
                     delay(500)
                 }
             }
@@ -386,7 +314,7 @@ class SeriesActivity : ComponentActivity() {
 
             LaunchedEffect(toast) {
                 if (toast == null) return@LaunchedEffect
-                delay(if (nextEpisodeMsg) 3500 else 1800)
+                delay(1800)
                 toast = null
             }
 
@@ -413,23 +341,19 @@ class SeriesActivity : ComponentActivity() {
                 }
             }
 
-            val title = info?.displayTitle?.takeIf { it.isNotBlank() } ?: seriesName
-            val cover = info?.posterUrl?.takeIf { it.isNotBlank() } ?: seriesCoverExtra
-            val backdrop = info?.backdropUrl ?: selectedEpisode?.image ?: cover
+            val title = info?.displayTitle?.takeIf { it.isNotBlank() } ?: movieName
+            val cover = info?.posterUrl?.takeIf { it.isNotBlank() } ?: movieCoverExtra
+            val backdrop = info?.backdropUrl ?: cover
             val castText = info?.cast?.takeIf { it.isNotBlank() } ?: "—"
             val plotText = info?.plot?.takeIf { it.isNotBlank() }
-                ?: "Disfruta de todos los episodios en alta definición."
+                ?: "Disfruta de esta película en alta definición."
             val dateLine = buildString {
                 val d = info?.displayDate.orEmpty()
                 if (d.isNotBlank()) append(d).append(" | ")
                 append(title)
             }
             val rating = info?.ratingBadge.orEmpty()
-            val epTag = selectedEpisode?.let { "T${selectedSeason ?: it.season} - E${it.episodeNum}" } ?: ""
-            val epRange = if (episodes.isNotEmpty()) {
-                val nums = episodes.map { it.episodeNum }.filter { it > 0 }
-                if (nums.isNotEmpty()) "${nums.min()}-${nums.max()}" else "1-${episodes.size}"
-            } else ""
+            val genreLine = info?.genre?.takeIf { it.isNotBlank() }.orEmpty()
 
             Box(
                 Modifier
@@ -459,24 +383,18 @@ class SeriesActivity : ComponentActivity() {
                         }
                     }
             ) {
-                // Un solo surface VLC: miniatura o pantalla completa (misma instancia)
                 AndroidView(
                     factory = { ctx ->
-                        VLCVideoLayout(ctx).apply {
-                            layoutParams = FrameLayout.LayoutParams(
+                        VLCVideoLayout(ctx).also { layout ->
+                            layout.layoutParams = FrameLayout.LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                                 ViewGroup.LayoutParams.MATCH_PARENT
                             )
-                            keepScreenOn = true
-                            isFocusable = false
-                            isFocusableInTouchMode = false
-                            engine.attach(this)
+                            engine.attach(layout)
                         }
                     },
                     modifier = if (fullScreen) {
-                        Modifier
-                            .fillMaxSize()
-                            .zIndex(0f)
+                        Modifier.fillMaxSize().zIndex(3f)
                     } else if (slotW > 0 && slotH > 0) {
                         Modifier
                             .zIndex(3f)
@@ -532,7 +450,7 @@ class SeriesActivity : ComponentActivity() {
                             Modifier.fillMaxSize().zIndex(2f),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(color = SeriesBlue)
+                            CircularProgressIndicator(color = MovieBlue)
                         }
                         error != null -> Box(
                             Modifier.fillMaxSize().zIndex(2f),
@@ -546,7 +464,6 @@ class SeriesActivity : ComponentActivity() {
                                 .zIndex(2f)
                                 .padding(horizontal = 22.dp, vertical = 10.dp)
                         ) {
-                            // Carátula esquina izq. arriba | info | mini player 16:9
                             Row(
                                 Modifier
                                     .weight(1.05f, fill = true)
@@ -588,7 +505,7 @@ class SeriesActivity : ComponentActivity() {
                                             Box(
                                                 Modifier
                                                     .clip(RoundedCornerShape(6.dp))
-                                                    .background(SeriesRating)
+                                                    .background(MovieRating)
                                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
@@ -608,13 +525,15 @@ class SeriesActivity : ComponentActivity() {
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                    if (epTag.isNotBlank()) {
+                                    if (genreLine.isNotBlank()) {
                                         Spacer(Modifier.height(4.dp))
                                         Text(
-                                            epTag,
-                                            color = SeriesAmber,
+                                            genreLine,
+                                            color = MovieAmber,
                                             fontSize = 13.sp,
-                                            fontWeight = FontWeight.Black
+                                            fontWeight = FontWeight.Black,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                     Spacer(Modifier.height(4.dp))
@@ -645,7 +564,7 @@ class SeriesActivity : ComponentActivity() {
                                             plotText,
                                             color = Color.White.copy(alpha = 0.8f),
                                             fontSize = 11.sp,
-                                            maxLines = 2,
+                                            maxLines = 3,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f)
                                         )
@@ -655,10 +574,10 @@ class SeriesActivity : ComponentActivity() {
                                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        SeriesActionButton("Pantalla completa", Icons.Filled.Tv, true) {
+                                        MovieActionButton("Pantalla completa", Icons.Filled.Tv, true) {
                                             requestFullscreen()
                                         }
-                                        SeriesActionButton("Idioma y subtítulos", Icons.Filled.Subtitles, false) {
+                                        MovieActionButton("Idioma y subtítulos", Icons.Filled.Subtitles, false) {
                                             toast = engine.cycleAudioTrack()
                                                 ?: engine.cycleSubtitleTrack()
                                                 ?: "Sin pistas"
@@ -666,7 +585,6 @@ class SeriesActivity : ComponentActivity() {
                                     }
                                 }
 
-                                // Mini player 16:9 (sin estirar)
                                 Box(
                                     Modifier
                                         .width(360.dp)
@@ -683,118 +601,8 @@ class SeriesActivity : ComponentActivity() {
                                 )
                             }
 
-                            Spacer(Modifier.height(8.dp))
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    items(seasons.keys.toList(), key = { it }) { season ->
-                                        val selected = season == selectedSeason
-                                        var focused by remember { mutableStateOf(false) }
-                                        Box(
-                                            Modifier
-                                                .onFocusChanged { focused = it.isFocused }
-                                                .clip(RoundedCornerShape(18.dp))
-                                                .background(
-                                                    when {
-                                                        focused || selected -> SeriesBlue
-                                                        else -> Color.White.copy(alpha = 0.12f)
-                                                    }
-                                                )
-                                                .border(
-                                                    BorderStroke(
-                                                        if (focused) 2.dp else 1.dp,
-                                                        Color.White.copy(alpha = if (focused) 0.95f else 0.2f)
-                                                    ),
-                                                    RoundedCornerShape(18.dp)
-                                                )
-                                                .clickable { selectedSeason = season }
-                                                .focusable()
-                                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                "Temporada $season",
-                                                color = Color.White,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontSize = 12.sp
-                                            )
-                                        }
-                                    }
-                                }
-                                if (epRange.isNotBlank()) {
-                                    Box(
-                                        Modifier
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(Color.White.copy(alpha = 0.12f))
-                                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                                    ) {
-                                        Text(epRange, color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp)
-                                    }
-                                }
-                            }
-
-                            Spacer(Modifier.height(6.dp))
-
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                contentPadding = PaddingValues(bottom = 2.dp)
-                            ) {
-                                items(episodes, key = { it.id }) { ep ->
-                                    val selected = ep.id == selectedEpisode?.id
-                                    var focused by remember { mutableStateOf(false) }
-                                    Box(
-                                        Modifier
-                                            .size(40.dp)
-                                            .onFocusChanged { focused = it.isFocused }
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(
-                                                when {
-                                                    focused || selected -> SeriesBlue
-                                                    else -> Color.White.copy(alpha = 0.10f)
-                                                }
-                                            )
-                                            .border(
-                                                BorderStroke(
-                                                    if (focused || selected) 2.dp else 1.dp,
-                                                    Color.White.copy(alpha = if (focused || selected) 0.9f else 0.22f)
-                                                ),
-                                                RoundedCornerShape(8.dp)
-                                            )
-                                            .clickable { playEpisode(ep) }
-                                            .focusable(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (selected) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(
-                                                    Icons.Filled.PlayArrow,
-                                                    null,
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                                Text(
-                                                    "${ep.episodeNum}",
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 12.sp
-                                                )
-                                            }
-                                        } else {
-                                            Text(
-                                                "${ep.episodeNum}",
-                                                color = Color.White,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontSize = 13.sp
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
                             if (recommended.isNotEmpty()) {
-                                Spacer(Modifier.height(8.dp))
+                                Spacer(Modifier.height(10.dp))
                                 Text(
                                     "Recomendadas",
                                     color = Color.White,
@@ -809,8 +617,8 @@ class SeriesActivity : ComponentActivity() {
                                     items(recommended, key = { it.id }) { item ->
                                         var focused by remember { mutableStateOf(false) }
                                         AsyncImage(
-                                            model = item.cover,
-                                            contentDescription = item.name,
+                                            model = item.streamIcon,
+                                            contentDescription = item.displayName,
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier
                                                 .width(108.dp)
@@ -820,7 +628,7 @@ class SeriesActivity : ComponentActivity() {
                                                 .border(
                                                     BorderStroke(
                                                         if (focused) 2.dp else 0.dp,
-                                                        if (focused) SeriesBlue else Color.Transparent
+                                                        if (focused) MovieBlue else Color.Transparent
                                                     ),
                                                     RoundedCornerShape(8.dp)
                                                 )
@@ -834,7 +642,6 @@ class SeriesActivity : ComponentActivity() {
                         }
                     }
                 } else {
-                    // Controles de pantalla completa sobre el MISMO video
                     if (hudVisible) {
                         Row(
                             Modifier
@@ -861,7 +668,7 @@ class SeriesActivity : ComponentActivity() {
                             )
                             Column(Modifier.weight(1f)) {
                                 Text(
-                                    "$title · $epTag",
+                                    title,
                                     color = Color.White,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
@@ -886,9 +693,9 @@ class SeriesActivity : ComponentActivity() {
                                     Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text(formatSeriesTime(position), color = Color.White, fontSize = 11.sp)
+                                    Text(formatMovieTime(position), color = Color.White, fontSize = 11.sp)
                                     Text(
-                                        formatSeriesTime(duration),
+                                        formatMovieTime(duration),
                                         color = Color.White.copy(alpha = 0.65f),
                                         fontSize = 11.sp
                                     )
@@ -898,10 +705,10 @@ class SeriesActivity : ComponentActivity() {
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    MiniHudBtn(Icons.Filled.Replay10, "−10s") {
+                                    MovieHudBtn(Icons.Filled.Replay10, "−10s") {
                                         engine.seekBy(-10_000); bumpHud()
                                     }
-                                    MiniHudBtn(
+                                    MovieHudBtn(
                                         if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                         if (playing) "Pausa" else "Play",
                                         playFocus
@@ -910,18 +717,18 @@ class SeriesActivity : ComponentActivity() {
                                         playing = engine.isPlaying
                                         bumpHud()
                                     }
-                                    MiniHudBtn(Icons.Filled.Forward10, "+10s") {
+                                    MovieHudBtn(Icons.Filled.Forward10, "+10s") {
                                         engine.seekBy(10_000); bumpHud()
                                     }
-                                    MiniHudBtn(Icons.Filled.Translate, "Audio") {
+                                    MovieHudBtn(Icons.Filled.Translate, "Audio") {
                                         toast = engine.cycleAudioTrack() ?: "Sin audio"
                                         bumpHud()
                                     }
-                                    MiniHudBtn(Icons.Filled.Subtitles, "Subs") {
+                                    MovieHudBtn(Icons.Filled.Subtitles, "Subs") {
                                         toast = engine.cycleSubtitleTrack()
                                         bumpHud()
                                     }
-                                    MiniHudBtn(Icons.Filled.AspectRatio, "Pantalla") {
+                                    MovieHudBtn(Icons.Filled.AspectRatio, "Pantalla") {
                                         toast = engine.cycleAspectMode()
                                         bumpHud()
                                     }
@@ -935,7 +742,7 @@ class SeriesActivity : ComponentActivity() {
                     Text(
                         msg,
                         color = Color.White,
-                        fontSize = if (nextEpisodeMsg) 20.sp else 15.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -948,7 +755,7 @@ class SeriesActivity : ComponentActivity() {
                 if (showResumePrompt) {
                     ResumePrompt(
                         title = "¿Seguir viendo?",
-                        subtitle = selectedEpisode?.let { "T${it.season} · E${it.episodeNum}" },
+                        subtitle = title.takeIf { it.isNotBlank() },
                         onContinue = { applyResumeChoice(continueWatching = true) },
                         onFromStart = { applyResumeChoice(continueWatching = false) }
                     )
@@ -958,11 +765,11 @@ class SeriesActivity : ComponentActivity() {
     }
 
     companion object {
-        const val EXTRA_SERIES_ID = "series_id"
-        const val EXTRA_SERIES_NAME = "series_name"
-        const val EXTRA_SERIES_COVER = "series_cover"
+        const val EXTRA_MOVIE_ID = "movie_id"
+        const val EXTRA_MOVIE_NAME = "movie_name"
+        const val EXTRA_MOVIE_COVER = "movie_cover"
         const val EXTRA_CATEGORY_ID = "category_id"
-        const val EXTRA_RESUME_EPISODE_ID = "resume_episode_id"
+        const val EXTRA_EXT = "ext"
         const val EXTRA_RESUME_MS = "resume_ms"
         const val EXTRA_USER = "user"
         const val EXTRA_PASS = "pass"
@@ -970,12 +777,12 @@ class SeriesActivity : ComponentActivity() {
     }
 }
 
-private val SeriesBlue = Color(0xFF007AFF)
-private val SeriesAmber = Color(0xFFFFC107)
-private val SeriesRating = Color(0xFF00B0FF)
+private val MovieBlue = Color(0xFF007AFF)
+private val MovieAmber = Color(0xFFFFC107)
+private val MovieRating = Color(0xFF00B0FF)
 
 @Composable
-private fun SeriesActionButton(
+private fun MovieActionButton(
     label: String,
     icon: ImageVector,
     primary: Boolean,
@@ -983,8 +790,8 @@ private fun SeriesActionButton(
 ) {
     var focused by remember { mutableStateOf(false) }
     val bg = when {
-        focused -> SeriesBlue
-        primary -> SeriesAmber
+        focused -> MovieBlue
+        primary -> MovieAmber
         else -> Color.White.copy(alpha = 0.12f)
     }
     val fg = if (!focused && primary) Color.Black else Color.White
@@ -1013,7 +820,7 @@ private fun SeriesActionButton(
 }
 
 @Composable
-private fun MiniHudBtn(
+private fun MovieHudBtn(
     icon: ImageVector,
     label: String,
     focusRequester: FocusRequester? = null,
@@ -1044,7 +851,7 @@ private fun MiniHudBtn(
     }
 }
 
-private fun formatSeriesTime(ms: Long): String {
+private fun formatMovieTime(ms: Long): String {
     if (ms <= 0L) return "0:00"
     val totalSec = ms / 1000
     val h = totalSec / 3600

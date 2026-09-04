@@ -70,5 +70,13 @@
             android:launchMode="standard"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode"
             android:theme="@style/Theme.Nexo" />
+
+        <activity
+            android:name=".MovieActivity"
+            android:exported="false"
+            android:process=":vlc"
+            android:launchMode="standard"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode"
+            android:theme="@style/Theme.Nexo" />
     </application>
 </manifest>

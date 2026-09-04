@@ -56,14 +56,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import com.nexo.tv.LiveActivity
+import com.nexo.tv.MovieActivity
 import com.nexo.tv.SeriesActivity
 import com.nexo.tv.Session
-import com.nexo.tv.VodActivity
 import com.nexo.tv.data.Catalog
 import com.nexo.tv.data.ContinueWatching
 import com.nexo.tv.data.SeriesItem
 import com.nexo.tv.data.VodItem
-import com.nexo.tv.data.XtreamClient
 
 private val Orange = Color(0xFFDE5B17)
 private val PosterW = 132.dp
@@ -93,12 +92,16 @@ fun HubScreen(onLogout: () -> Unit) {
 
     fun openMovie(item: VodItem, resumeMs: Long = -1L) {
         ctx.startActivity(
-            Intent(ctx, VodActivity::class.java)
-                .putExtra(VodActivity.EXTRA_URL, XtreamClient.movieUrl(item.id, item.ext ?: "mp4"))
-                .putExtra(VodActivity.EXTRA_TITLE, item.displayName)
-                .putExtra(VodActivity.EXTRA_POSTER, item.streamIcon.orEmpty())
-                .putExtra(VodActivity.EXTRA_ID, item.id)
-                .putExtra(VodActivity.EXTRA_RESUME_MS, resumeMs)
+            Intent(ctx, MovieActivity::class.java)
+                .putExtra(MovieActivity.EXTRA_MOVIE_ID, item.id)
+                .putExtra(MovieActivity.EXTRA_MOVIE_NAME, item.displayName)
+                .putExtra(MovieActivity.EXTRA_MOVIE_COVER, item.streamIcon.orEmpty())
+                .putExtra(MovieActivity.EXTRA_CATEGORY_ID, item.categoryId.orEmpty())
+                .putExtra(MovieActivity.EXTRA_EXT, item.ext ?: "mp4")
+                .putExtra(MovieActivity.EXTRA_RESUME_MS, resumeMs)
+                .putExtra(MovieActivity.EXTRA_USER, Session.username)
+                .putExtra(MovieActivity.EXTRA_PASS, Session.password)
+                .putExtra(MovieActivity.EXTRA_SERVER, Session.server)
         )
     }
 
@@ -125,16 +128,20 @@ fun HubScreen(onLogout: () -> Unit) {
         when (item.kind) {
             "movie" -> {
                 val fromCatalog = movies.find { it.id == item.id }
-                val url = item.url?.takeIf { it.isNotBlank() }
-                    ?: fromCatalog?.let { XtreamClient.movieUrl(it.id, it.ext ?: "mp4") }
-                    ?: return
                 ctx.startActivity(
-                    Intent(ctx, VodActivity::class.java)
-                        .putExtra(VodActivity.EXTRA_URL, url)
-                        .putExtra(VodActivity.EXTRA_TITLE, item.title)
-                        .putExtra(VodActivity.EXTRA_POSTER, item.poster.orEmpty())
-                        .putExtra(VodActivity.EXTRA_ID, item.id)
-                        .putExtra(VodActivity.EXTRA_RESUME_MS, item.positionMs)
+                    Intent(ctx, MovieActivity::class.java)
+                        .putExtra(MovieActivity.EXTRA_MOVIE_ID, item.id)
+                        .putExtra(MovieActivity.EXTRA_MOVIE_NAME, item.title)
+                        .putExtra(MovieActivity.EXTRA_MOVIE_COVER, item.poster.orEmpty())
+                        .putExtra(
+                            MovieActivity.EXTRA_CATEGORY_ID,
+                            item.categoryId ?: fromCatalog?.categoryId.orEmpty()
+                        )
+                        .putExtra(MovieActivity.EXTRA_EXT, fromCatalog?.ext ?: "mp4")
+                        .putExtra(MovieActivity.EXTRA_RESUME_MS, item.positionMs)
+                        .putExtra(MovieActivity.EXTRA_USER, Session.username)
+                        .putExtra(MovieActivity.EXTRA_PASS, Session.password)
+                        .putExtra(MovieActivity.EXTRA_SERVER, Session.server)
                 )
             }
             "series" -> {
