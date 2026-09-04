@@ -108,7 +108,7 @@ fun HubScreen(onLogout: () -> Unit) {
                         )
                     } else {
                         PosterGrid(
-                            items = movies2026.map { it.id to (it.streamIcon to it.name) },
+                            items = movies2026.map { it.id to (it.streamIcon to it.displayName) },
                             onClick = { id ->
                                 val item = movies2026.find { it.id == id } ?: return@PosterGrid
                                 ctx.startActivity(
