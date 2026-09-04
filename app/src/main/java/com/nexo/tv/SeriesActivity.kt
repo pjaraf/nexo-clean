@@ -642,7 +642,7 @@ class SeriesActivity : ComponentActivity() {
                                 )
                                 Spacer(Modifier.height(6.dp))
                                 LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     contentPadding = PaddingValues(bottom = 2.dp)
                                 ) {
                                     items(recommended, key = { it.id }) { item ->
@@ -652,8 +652,8 @@ class SeriesActivity : ComponentActivity() {
                                             contentDescription = item.name,
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier
-                                                .width(72.dp)
-                                                .height(102.dp)
+                                                .width(108.dp)
+                                                .height(156.dp)
                                                 .onFocusChanged { focused = it.isFocused }
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .border(
