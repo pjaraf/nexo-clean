@@ -63,6 +63,7 @@ class LiveActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        keepAwakeWhileVisible()
         intent.getStringExtra(EXTRA_USER)?.let { Session.username = it }
         intent.getStringExtra(EXTRA_PASS)?.let { Session.password = it }
         intent.getStringExtra(EXTRA_SERVER)?.let { if (it.isNotBlank()) Session.server = it }

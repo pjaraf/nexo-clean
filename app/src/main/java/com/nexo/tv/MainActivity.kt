@@ -25,6 +25,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        keepAwakeWhileVisible()
 
         val bootUser = intent.getStringExtra("user")
         val bootPass = intent.getStringExtra("pass")
@@ -74,7 +75,6 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
-                // Chequeo OTA en login y en hub
                 if (screen == AppScreen.Login || screen == AppScreen.Hub) {
                     UpdateGate()
                 }

@@ -27,6 +27,7 @@ class VodActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        keepAwakeWhileVisible()
         val url = intent.getStringExtra(EXTRA_URL).orEmpty()
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         StreamBridge.start()
