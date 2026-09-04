@@ -78,6 +78,9 @@ import kotlinx.coroutines.delay
 import org.videolan.libvlc.util.VLCVideoLayout
 
 class LiveActivity : ComponentActivity() {
+    /** Último canal reproducido (para guardar al ir a Home / cerrar). */
+    @Volatile private var lastPlayed: LiveChannel? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -88,6 +91,16 @@ class LiveActivity : ComponentActivity() {
         StreamBridge.start()
         val engine = VlcEngine(this)
         val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+        fun persistWatching(ch: LiveChannel) {
+            lastPlayed = ch
+            // Guardar canal + categoría del canal visto (no "Todas").
+            val cat = ch.categoryId.orEmpty()
+            prefs.edit()
+                .putString(KEY_CHANNEL, ch.id)
+                .putString(KEY_CATEGORY, cat)
+                .apply()
+        }
 
         setContent {
             var allChannels by remember { mutableStateOf<List<LiveChannel>>(emptyList()) }
@@ -126,6 +139,7 @@ class LiveActivity : ComponentActivity() {
             }
 
             fun playChannel(ch: LiveChannel, instant: Boolean) {
+                persistWatching(ch)
                 val remote = XtreamClient.liveUrl(ch.id)
                 val toPlay = StreamBridge.maybeWrap(remote)
                 android.util.Log.i("LiveActivity", "play $remote -> $toPlay")
@@ -138,6 +152,7 @@ class LiveActivity : ComponentActivity() {
                 val list = activeChannels
                 if (list.size < 2) return
                 val n = list.size
+                // Rotación circular: último ↔ primero
                 listOf(list[(around + 1) % n], list[(around - 1 + n) % n]).forEach { ch ->
                     StreamBridge.warm(XtreamClient.liveUrl(ch.id))
                 }
@@ -145,23 +160,32 @@ class LiveActivity : ComponentActivity() {
 
             fun selectCategory(catId: String) {
                 selectedCategoryId = catId
-                prefs.edit().putString(KEY_CATEGORY, catId).apply()
                 showCategories = false
                 val list = if (catId.isBlank()) allChannels
                 else allChannels.filter { it.categoryId == catId }.ifEmpty { allChannels }
                 if (list.isEmpty()) {
                     status = "Sin canales en categoría"
+                    prefs.edit().putString(KEY_CATEGORY, catId).apply()
                     return
                 }
-                index = 0
-                playChannel(list[0], instant = true)
-                warmNeighbors(0)
+                // Retomar último canal de esta categoría si existe; si no, el primero.
+                val savedId = prefs.getString(KEY_CHANNEL, null).orEmpty()
+                val resumeIdx = list.indexOfFirst { it.id == savedId }.takeIf { it >= 0 } ?: 0
+                index = resumeIdx
+                // playChannel guarda canal + categoría del canal visto
+                playChannel(list[resumeIdx], instant = true)
+                // Si eligió "Todas", persistir filtro vacío aparte del canal.
+                if (catId.isBlank()) {
+                    prefs.edit().putString(KEY_CATEGORY, "").apply()
+                }
+                warmNeighbors(resumeIdx)
                 runCatching { rootFocus.requestFocus() }
             }
 
             fun zap(delta: Int) {
                 val list = activeChannels
                 if (list.isEmpty()) return
+                // Loop: al pasar el último vuelve al primero (y viceversa).
                 index = (index + delta + list.size) % list.size
                 playChannel(list[index], instant = false)
                 warmNeighbors(index)
@@ -203,26 +227,39 @@ class LiveActivity : ComponentActivity() {
                 }
                 allChannels = streams
                 loading = false
+
+                val savedChannelId = prefs.getString(KEY_CHANNEL, null).orEmpty()
+                val savedChannel = streams.firstOrNull { it.id == savedChannelId }
+
+                // Al reabrir: categoría del último canal visto (+ ese canal).
+                val catId = when {
+                    savedChannel != null -> savedChannel.categoryId.orEmpty()
+                    else -> {
+                        val raw = prefs.getString(KEY_CATEGORY, null).orEmpty()
+                        if (raw.isNotBlank() && cats.any { it.categoryId == raw }) raw else ""
+                    }
+                }
+                selectedCategoryId = catId
+                prefs.edit().putString(KEY_CATEGORY, catId).apply()
+
                 android.util.Log.i(
                     "LiveActivity",
-                    "channels=${streams.size} cats=${cats.size} selected=$selectedCategoryId"
+                    "channels=${streams.size} cats=${cats.size} cat=$catId ch=$savedChannelId"
                 )
 
-                // Si la categoría guardada ya no existe, usar Todas
-                if (selectedCategoryId.isNotBlank() &&
-                    cats.none { it.categoryId == selectedCategoryId }
-                ) {
-                    selectedCategoryId = ""
-                    prefs.edit().putString(KEY_CATEGORY, "").apply()
-                }
+                val list = if (catId.isBlank()) streams
+                else streams.filter { it.categoryId == catId }.ifEmpty { streams }
 
-                val list = if (selectedCategoryId.isBlank()) streams
-                else streams.filter { it.categoryId == selectedCategoryId }.ifEmpty { streams }
-                val first = list.firstOrNull()
-                if (first != null) {
-                    index = 0
-                    playChannel(first, instant = true)
-                    warmNeighbors(0)
+                val playIdx = when {
+                    savedChannelId.isNotBlank() ->
+                        list.indexOfFirst { it.id == savedChannelId }.takeIf { it >= 0 } ?: 0
+                    else -> 0
+                }
+                val start = list.getOrNull(playIdx)
+                if (start != null) {
+                    index = playIdx
+                    playChannel(start, instant = true)
+                    warmNeighbors(playIdx)
                 } else {
                     status = "Sin canales"
                 }
@@ -235,7 +272,10 @@ class LiveActivity : ComponentActivity() {
             BackHandler {
                 when {
                     showCategories -> showCategories = false
-                    else -> finish()
+                    else -> {
+                        current?.let { persistWatching(it) }
+                        finish()
+                    }
                 }
             }
 
@@ -359,12 +399,33 @@ class LiveActivity : ComponentActivity() {
         }
     }
 
+    override fun onPause() {
+        lastPlayed?.let { ch ->
+            getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(KEY_CHANNEL, ch.id)
+                .putString(KEY_CATEGORY, ch.categoryId.orEmpty())
+                .apply()
+        }
+        super.onPause()
+    }
+
+    override fun onStop() {
+        lastPlayed?.let { ch ->
+            getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(KEY_CHANNEL, ch.id)
+                .putString(KEY_CATEGORY, ch.categoryId.orEmpty())
+                .apply()
+        }
+        super.onStop()
+    }
+
     companion object {
         const val EXTRA_USER = "user"
         const val EXTRA_PASS = "pass"
         const val EXTRA_SERVER = "server"
         private const val PREFS = "nexo_live"
         private const val KEY_CATEGORY = "category_id"
+        private const val KEY_CHANNEL = "channel_id"
     }
 }
 
