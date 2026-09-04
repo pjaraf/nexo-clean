@@ -66,6 +66,7 @@ data class SeriesDetailInfo(
     @SerializedName("movie_image") val movieImage: String? = null,
     @SerializedName("cover_big") val coverBig: String? = null,
     val plot: String? = null,
+    val description: String? = null,
     val cast: String? = null,
     val genre: String? = null,
     @SerializedName("release_date") val releaseDate: String? = null,
@@ -74,6 +75,8 @@ data class SeriesDetailInfo(
     @SerializedName("backdrop_path") val backdropPath: Any? = null
 ) {
     val displayTitle: String get() = name?.trim().orEmpty()
+    val displayPlot: String?
+        get() = plot?.takeIf { it.isNotBlank() } ?: description?.takeIf { it.isNotBlank() }
     val posterUrl: String?
         get() = cover?.takeIf { it.isNotBlank() }
             ?: movieImage?.takeIf { it.isNotBlank() }

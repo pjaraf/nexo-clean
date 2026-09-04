@@ -417,7 +417,7 @@ class SeriesActivity : ComponentActivity() {
             val cover = info?.posterUrl?.takeIf { it.isNotBlank() } ?: seriesCoverExtra
             val backdrop = info?.backdropUrl ?: selectedEpisode?.image ?: cover
             val castText = info?.cast?.takeIf { it.isNotBlank() } ?: "—"
-            val plotText = info?.plot?.takeIf { it.isNotBlank() }
+            val plotText = info?.displayPlot
                 ?: "Disfruta de todos los episodios en alta definición."
             val dateLine = buildString {
                 val d = info?.displayDate.orEmpty()
@@ -436,26 +436,48 @@ class SeriesActivity : ComponentActivity() {
                     .fillMaxSize()
                     .background(Color(0xFF0D0E15))
                     .onPreviewKeyEvent { e ->
-                        if (!fullScreen) return@onPreviewKeyEvent false
+                        if (!fullScreen || showResumePrompt) return@onPreviewKeyEvent false
                         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                         if (e.nativeKeyEvent.repeatCount > 0) return@onPreviewKeyEvent true
-                        when (e.nativeKeyEvent.keyCode) {
-                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                            AndroidKeyEvent.KEYCODE_ENTER,
-                            AndroidKeyEvent.KEYCODE_DPAD_UP,
-                            AndroidKeyEvent.KEYCODE_DPAD_DOWN,
-                            AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                                bumpHud(); true
+                        val code = e.nativeKeyEvent.keyCode
+                        if (hudVisible) {
+                            when (code) {
+                                AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                                    engine.togglePause(); playing = engine.isPlaying; bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_MEDIA_PLAY -> {
+                                    engine.resume(); playing = true; bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                                    engine.pause(); playing = false; bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                                    engine.seekBy(10_000); bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
+                                    engine.seekBy(-10_000); bumpHud(); true
+                                }
+                                else -> false
                             }
-                            AndroidKeyEvent.KEYCODE_DPAD_LEFT,
-                            AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
-                                engine.seekBy(-10_000); bumpHud(); true
+                        } else {
+                            when (code) {
+                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                AndroidKeyEvent.KEYCODE_ENTER,
+                                AndroidKeyEvent.KEYCODE_DPAD_UP,
+                                AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+                                AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                                    bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_DPAD_LEFT,
+                                AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
+                                    engine.seekBy(-10_000); bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+                                AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                                    engine.seekBy(10_000); bumpHud(); true
+                                }
+                                else -> false
                             }
-                            AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
-                            AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                                engine.seekBy(10_000); bumpHud(); true
-                            }
-                            else -> false
                         }
                     }
             ) {
@@ -839,7 +861,7 @@ class SeriesActivity : ComponentActivity() {
                         Row(
                             Modifier
                                 .align(Alignment.BottomCenter)
-                                .zIndex(2f)
+                                .zIndex(4f)
                                 .fillMaxWidth()
                                 .background(
                                     Brush.verticalGradient(

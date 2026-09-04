@@ -69,7 +69,8 @@ class VlcEngine(context: Context) {
             if (layout != null) player.detachViews()
         } catch (_: Throwable) {}
         layout = view
-        player.attachViews(view, null, false, false)
+        // TextureView: el video respeta z-order/clip de Compose (SurfaceView tapa la UI en TV).
+        player.attachViews(view, null, true, true)
         applyAspectMode()
     }
 

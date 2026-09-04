@@ -256,7 +256,8 @@ class MovieActivity : ComponentActivity() {
                 }
                 if (wantResume > 20_000L) {
                     resumeChoiceMs = wantResume
-                    expandAfterChoice = resumeFromIntent > 0L
+                    // Quedar en detalle con mini player (no saltar a pantalla completa).
+                    expandAfterChoice = false
                     showResumePrompt = true
                     playMovie(resumeMs = 0L)
                 } else {
@@ -345,7 +346,7 @@ class MovieActivity : ComponentActivity() {
             val cover = info?.posterUrl?.takeIf { it.isNotBlank() } ?: movieCoverExtra
             val backdrop = info?.backdropUrl ?: cover
             val castText = info?.cast?.takeIf { it.isNotBlank() } ?: "—"
-            val plotText = info?.plot?.takeIf { it.isNotBlank() }
+            val plotText = info?.displayPlot
                 ?: "Disfruta de esta película en alta definición."
             val dateLine = buildString {
                 val d = info?.displayDate.orEmpty()
@@ -360,26 +361,49 @@ class MovieActivity : ComponentActivity() {
                     .fillMaxSize()
                     .background(Color(0xFF0D0E15))
                     .onPreviewKeyEvent { e ->
-                        if (!fullScreen) return@onPreviewKeyEvent false
+                        if (!fullScreen || showResumePrompt) return@onPreviewKeyEvent false
                         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                         if (e.nativeKeyEvent.repeatCount > 0) return@onPreviewKeyEvent true
-                        when (e.nativeKeyEvent.keyCode) {
-                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                            AndroidKeyEvent.KEYCODE_ENTER,
-                            AndroidKeyEvent.KEYCODE_DPAD_UP,
-                            AndroidKeyEvent.KEYCODE_DPAD_DOWN,
-                            AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                                bumpHud(); true
+                        val code = e.nativeKeyEvent.keyCode
+                        if (hudVisible) {
+                            // Con HUD visible, el DPAD navega botones (no consumir).
+                            when (code) {
+                                AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                                    engine.togglePause(); playing = engine.isPlaying; bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_MEDIA_PLAY -> {
+                                    engine.resume(); playing = true; bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                                    engine.pause(); playing = false; bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                                    engine.seekBy(10_000); bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
+                                    engine.seekBy(-10_000); bumpHud(); true
+                                }
+                                else -> false
                             }
-                            AndroidKeyEvent.KEYCODE_DPAD_LEFT,
-                            AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
-                                engine.seekBy(-10_000); bumpHud(); true
+                        } else {
+                            when (code) {
+                                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                AndroidKeyEvent.KEYCODE_ENTER,
+                                AndroidKeyEvent.KEYCODE_DPAD_UP,
+                                AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+                                AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                                    bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_DPAD_LEFT,
+                                AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
+                                    engine.seekBy(-10_000); bumpHud(); true
+                                }
+                                AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+                                AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                                    engine.seekBy(10_000); bumpHud(); true
+                                }
+                                else -> false
                             }
-                            AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
-                            AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                                engine.seekBy(10_000); bumpHud(); true
-                            }
-                            else -> false
                         }
                     }
             ) {
@@ -390,11 +414,14 @@ class MovieActivity : ComponentActivity() {
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                                 ViewGroup.LayoutParams.MATCH_PARENT
                             )
+                            layout.keepScreenOn = true
+                            layout.isFocusable = false
+                            layout.isFocusableInTouchMode = false
                             engine.attach(layout)
                         }
                     },
                     modifier = if (fullScreen) {
-                        Modifier.fillMaxSize().zIndex(3f)
+                        Modifier.fillMaxSize().zIndex(0f)
                     } else if (slotW > 0 && slotH > 0) {
                         Modifier
                             .zIndex(3f)
@@ -646,7 +673,7 @@ class MovieActivity : ComponentActivity() {
                         Row(
                             Modifier
                                 .align(Alignment.BottomCenter)
-                                .zIndex(2f)
+                                .zIndex(4f)
                                 .fillMaxWidth()
                                 .background(
                                     Brush.verticalGradient(
