@@ -78,6 +78,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.nexo.tv.data.ContinueWatching
@@ -855,116 +857,158 @@ class SeriesActivity : ComponentActivity() {
                             }
                         }
                     }
-                } else {
-                    // Controles de pantalla completa sobre el MISMO video
-                    if (hudVisible) {
-                        Row(
+                } else if (hudVisible) {
+                    Dialog(
+                        onDismissRequest = { hudVisible = false },
+                        properties = DialogProperties(
+                            dismissOnBackPress = false,
+                            dismissOnClickOutside = false,
+                            usePlatformDefaultWidth = false,
+                            decorFitsSystemWindows = false
+                        )
+                    ) {
+                        Box(
                             Modifier
-                                .align(Alignment.BottomCenter)
-                                .zIndex(4f)
-                                .fillMaxWidth()
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(Color.Transparent, Color(0xE6000000))
-                                    )
-                                )
-                                .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp),
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                .fillMaxSize()
+                                .background(Color.Transparent)
+                                .onPreviewKeyEvent { e ->
+                                    if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                                    if (e.nativeKeyEvent.repeatCount > 0) return@onPreviewKeyEvent true
+                                    when (e.nativeKeyEvent.keyCode) {
+                                        AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                                            engine.togglePause(); playing = engine.isPlaying; bumpHud(); true
+                                        }
+                                        AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                                            engine.seekBy(10_000); bumpHud(); true
+                                        }
+                                        AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
+                                            engine.seekBy(-10_000); bumpHud(); true
+                                        }
+                                        else -> false
+                                    }
+                                }
                         ) {
-                            AsyncImage(
-                                model = cover,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .width(52.dp)
-                                    .height(78.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                            )
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    "$title · $epTag",
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                val progress = if (duration > 0) {
-                                    (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
-                                } else 0f
-                                LinearProgressIndicator(
-                                    progress = { progress },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(3.dp)
-                                        .clip(RoundedCornerShape(2.dp)),
-                                    color = Color(0xFFDE5B17),
-                                    trackColor = Color.White.copy(alpha = 0.22f)
-                                )
-                                Spacer(Modifier.height(3.dp))
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(formatSeriesTime(position), color = Color.White, fontSize = 11.sp)
-                                    Text(
-                                        formatSeriesTime(duration),
-                                        color = Color.White.copy(alpha = 0.65f),
-                                        fontSize = 11.sp
+                            Row(
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(Color.Transparent, Color(0xE6000000))
+                                        )
                                     )
-                                }
-                                Spacer(Modifier.height(6.dp))
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    MiniHudBtn(Icons.Filled.Replay10, "−10s") {
-                                        engine.seekBy(-10_000); bumpHud()
-                                    }
-                                    MiniHudBtn(
-                                        if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                        if (playing) "Pausa" else "Play",
-                                        playFocus
+                                    .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp),
+                                verticalAlignment = Alignment.Bottom,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                AsyncImage(
+                                    model = cover,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .width(52.dp)
+                                        .height(78.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                )
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        "$title · $epTag",
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    val progress = if (duration > 0) {
+                                        (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+                                    } else 0f
+                                    LinearProgressIndicator(
+                                        progress = { progress },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(3.dp)
+                                            .clip(RoundedCornerShape(2.dp)),
+                                        color = Color(0xFFDE5B17),
+                                        trackColor = Color.White.copy(alpha = 0.22f)
+                                    )
+                                    Spacer(Modifier.height(3.dp))
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        engine.togglePause()
-                                        playing = engine.isPlaying
-                                        bumpHud()
+                                        Text(formatSeriesTime(position), color = Color.White, fontSize = 11.sp)
+                                        Text(
+                                            formatSeriesTime(duration),
+                                            color = Color.White.copy(alpha = 0.65f),
+                                            fontSize = 11.sp
+                                        )
                                     }
-                                    MiniHudBtn(Icons.Filled.Forward10, "+10s") {
-                                        engine.seekBy(10_000); bumpHud()
-                                    }
-                                    MiniHudBtn(Icons.Filled.Translate, "Audio") {
-                                        toast = engine.cycleAudioTrack() ?: "Sin audio"
-                                        bumpHud()
-                                    }
-                                    MiniHudBtn(Icons.Filled.Subtitles, "Subs") {
-                                        toast = engine.cycleSubtitleTrack()
-                                        bumpHud()
-                                    }
-                                    MiniHudBtn(Icons.Filled.AspectRatio, "Pantalla") {
-                                        toast = engine.cycleAspectMode()
-                                        bumpHud()
+                                    Spacer(Modifier.height(6.dp))
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        MiniHudBtn(Icons.Filled.Replay10, "−10s") {
+                                            engine.seekBy(-10_000); bumpHud()
+                                        }
+                                        MiniHudBtn(
+                                            if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                            if (playing) "Pausa" else "Play",
+                                            playFocus
+                                        ) {
+                                            engine.togglePause()
+                                            playing = engine.isPlaying
+                                            bumpHud()
+                                        }
+                                        MiniHudBtn(Icons.Filled.Forward10, "+10s") {
+                                            engine.seekBy(10_000); bumpHud()
+                                        }
+                                        MiniHudBtn(Icons.Filled.Translate, "Audio") {
+                                            toast = engine.cycleAudioTrack() ?: "Sin audio"
+                                            bumpHud()
+                                        }
+                                        MiniHudBtn(Icons.Filled.Subtitles, "Subs") {
+                                            toast = engine.cycleSubtitleTrack()
+                                            bumpHud()
+                                        }
+                                        MiniHudBtn(Icons.Filled.AspectRatio, "Pantalla") {
+                                            toast = engine.cycleAspectMode()
+                                            bumpHud()
+                                        }
                                     }
                                 }
+                            }
+                            toast?.let { msg ->
+                                Text(
+                                    msg,
+                                    color = Color.White,
+                                    fontSize = if (nextEpisodeMsg) 20.sp else 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .background(Color(0xCC000000), RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 18.dp, vertical = 12.dp)
+                                )
                             }
                         }
                     }
                 }
 
-                toast?.let { msg ->
-                    Text(
-                        msg,
-                        color = Color.White,
-                        fontSize = if (nextEpisodeMsg) 20.sp else 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .zIndex(5f)
-                            .background(Color(0xCC000000), RoundedCornerShape(10.dp))
-                            .padding(horizontal = 18.dp, vertical = 12.dp)
-                    )
+                if (!fullScreen) {
+                    toast?.let { msg ->
+                        Text(
+                            msg,
+                            color = Color.White,
+                            fontSize = if (nextEpisodeMsg) 20.sp else 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .zIndex(5f)
+                                .background(Color(0xCC000000), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 18.dp, vertical = 12.dp)
+                        )
+                    }
                 }
 
                 if (showResumePrompt) {

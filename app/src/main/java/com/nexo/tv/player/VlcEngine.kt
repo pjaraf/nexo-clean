@@ -69,8 +69,9 @@ class VlcEngine(context: Context) {
             if (layout != null) player.detachViews()
         } catch (_: Throwable) {}
         layout = view
-        // TextureView: el video respeta z-order/clip de Compose (SurfaceView tapa la UI en TV).
-        player.attachViews(view, null, true, true)
+        // SurfaceView: mejor rendimiento en TV Box. El HUD fullscreen va en Dialog
+        // (ventana aparte) para no quedar tapado por el surface.
+        player.attachViews(view, null, true, false)
         applyAspectMode()
     }
 
