@@ -31,8 +31,10 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,16 +47,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import com.nexo.tv.LiveActivity
 import com.nexo.tv.SeriesActivity
 import com.nexo.tv.Session
 import com.nexo.tv.VodActivity
 import com.nexo.tv.data.Catalog
+import com.nexo.tv.data.ContinueWatching
 import com.nexo.tv.data.SeriesItem
 import com.nexo.tv.data.VodItem
 import com.nexo.tv.data.XtreamClient
@@ -68,31 +74,84 @@ private enum class Tab { HOME, TV, SERIES, MOVIES }
 @Composable
 fun HubScreen(onLogout: () -> Unit) {
     val ctx = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var tab by remember { mutableStateOf(Tab.HOME) }
+    var continueItems by remember { mutableStateOf(ContinueWatching.list(ctx)) }
     val movies = Catalog.movies
     val series = Catalog.series
     val movies2026 = remember(movies) { movies.filter { it.matchesYear(2026) } }
 
-    fun openMovie(item: VodItem) {
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                continueItems = ContinueWatching.list(ctx)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
+
+    fun openMovie(item: VodItem, resumeMs: Long = -1L) {
         ctx.startActivity(
             Intent(ctx, VodActivity::class.java)
                 .putExtra(VodActivity.EXTRA_URL, XtreamClient.movieUrl(item.id, item.ext ?: "mp4"))
                 .putExtra(VodActivity.EXTRA_TITLE, item.displayName)
                 .putExtra(VodActivity.EXTRA_POSTER, item.streamIcon.orEmpty())
+                .putExtra(VodActivity.EXTRA_ID, item.id)
+                .putExtra(VodActivity.EXTRA_RESUME_MS, resumeMs)
         )
     }
 
-    fun openSeries(item: SeriesItem) {
+    fun openSeries(
+        item: SeriesItem,
+        resumeEpisodeId: String = "",
+        resumeMs: Long = -1L
+    ) {
         ctx.startActivity(
             Intent(ctx, SeriesActivity::class.java)
                 .putExtra(SeriesActivity.EXTRA_SERIES_ID, item.id)
                 .putExtra(SeriesActivity.EXTRA_SERIES_NAME, item.name)
                 .putExtra(SeriesActivity.EXTRA_SERIES_COVER, item.cover.orEmpty())
                 .putExtra(SeriesActivity.EXTRA_CATEGORY_ID, item.categoryId.orEmpty())
+                .putExtra(SeriesActivity.EXTRA_RESUME_EPISODE_ID, resumeEpisodeId)
+                .putExtra(SeriesActivity.EXTRA_RESUME_MS, resumeMs)
                 .putExtra(SeriesActivity.EXTRA_USER, Session.username)
                 .putExtra(SeriesActivity.EXTRA_PASS, Session.password)
                 .putExtra(SeriesActivity.EXTRA_SERVER, Session.server)
         )
+    }
+
+    fun openContinue(item: ContinueWatching.Item) {
+        when (item.kind) {
+            "movie" -> {
+                val fromCatalog = movies.find { it.id == item.id }
+                val url = item.url?.takeIf { it.isNotBlank() }
+                    ?: fromCatalog?.let { XtreamClient.movieUrl(it.id, it.ext ?: "mp4") }
+                    ?: return
+                ctx.startActivity(
+                    Intent(ctx, VodActivity::class.java)
+                        .putExtra(VodActivity.EXTRA_URL, url)
+                        .putExtra(VodActivity.EXTRA_TITLE, item.title)
+                        .putExtra(VodActivity.EXTRA_POSTER, item.poster.orEmpty())
+                        .putExtra(VodActivity.EXTRA_ID, item.id)
+                        .putExtra(VodActivity.EXTRA_RESUME_MS, item.positionMs)
+                )
+            }
+            "series" -> {
+                ctx.startActivity(
+                    Intent(ctx, SeriesActivity::class.java)
+                        .putExtra(SeriesActivity.EXTRA_SERIES_ID, item.id)
+                        .putExtra(SeriesActivity.EXTRA_SERIES_NAME, item.title)
+                        .putExtra(SeriesActivity.EXTRA_SERIES_COVER, item.poster.orEmpty())
+                        .putExtra(SeriesActivity.EXTRA_CATEGORY_ID, item.categoryId.orEmpty())
+                        .putExtra(SeriesActivity.EXTRA_RESUME_EPISODE_ID, item.episodeId.orEmpty())
+                        .putExtra(SeriesActivity.EXTRA_RESUME_MS, item.positionMs)
+                        .putExtra(SeriesActivity.EXTRA_USER, Session.username)
+                        .putExtra(SeriesActivity.EXTRA_PASS, Session.password)
+                        .putExtra(SeriesActivity.EXTRA_SERVER, Session.server)
+                )
+            }
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -102,7 +161,9 @@ fun HubScreen(onLogout: () -> Unit) {
             when (tab) {
                 Tab.HOME -> HomePane(
                     movies = movies2026,
-                    onMovie = { openMovie(it) }
+                    continueItems = continueItems,
+                    onMovie = { openMovie(it) },
+                    onContinue = { openContinue(it) }
                 )
                 Tab.SERIES -> Box(
                     Modifier
@@ -214,7 +275,9 @@ private fun NavIcon(icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun HomePane(
     movies: List<VodItem>,
-    onMovie: (VodItem) -> Unit
+    continueItems: List<ContinueWatching.Item>,
+    onMovie: (VodItem) -> Unit,
+    onContinue: (ContinueWatching.Item) -> Unit
 ) {
     var featured by remember(movies) { mutableStateOf(movies.firstOrNull()) }
 
@@ -224,7 +287,7 @@ private fun HomePane(
             .padding(start = 88.dp, end = 20.dp, top = 26.dp, bottom = 14.dp)
     ) {
         Text("NEXO", color = Orange, fontSize = 32.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.height(22.dp))
+        Spacer(Modifier.height(18.dp))
 
         featured?.let { movie ->
             Row(
@@ -235,12 +298,12 @@ private fun HomePane(
                     Text(
                         text = movie.displayName,
                         color = Color.White,
-                        fontSize = 30.sp,
+                        fontSize = 28.sp,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 3,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(14.dp))
                     Row(
                         Modifier
                             .tvFocus(shape = RoundedCornerShape(12.dp), focusedScale = 1.04f)
@@ -265,6 +328,20 @@ private fun HomePane(
                         .clickable { onMovie(movie) }
                         .focusable()
                 )
+            }
+        }
+
+        if (continueItems.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            Text("Seguir viendo", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                items(continueItems, key = { "${it.kind}:${it.id}" }) { item ->
+                    ContinuePoster(item = item, onClick = { onContinue(item) })
+                }
             }
         }
 
@@ -296,6 +373,54 @@ private fun HomePane(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ContinuePoster(item: ContinueWatching.Item, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .width(PosterW)
+            .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
+            .clickable(onClick = onClick)
+            .focusable()
+    ) {
+        Box {
+            AsyncImage(
+                model = item.poster,
+                contentDescription = item.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .width(PosterW)
+                    .height(PosterH)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF222222))
+            )
+            LinearProgressIndicator(
+                progress = { item.progress },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)),
+                color = Orange,
+                trackColor = Color.White.copy(alpha = 0.25f)
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            item.title,
+            color = Color.White,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            item.subtitle,
+            color = Color.White.copy(alpha = 0.65f),
+            fontSize = 11.sp,
+            maxLines = 1
+        )
     }
 }
 

@@ -79,6 +79,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
+import com.nexo.tv.data.ContinueWatching
 import com.nexo.tv.data.SeriesDetailInfo
 import com.nexo.tv.data.SeriesEpisode
 import com.nexo.tv.data.SeriesItem
@@ -106,6 +107,8 @@ class SeriesActivity : ComponentActivity() {
         val seriesName = intent.getStringExtra(EXTRA_SERIES_NAME).orEmpty()
         val seriesCoverExtra = intent.getStringExtra(EXTRA_SERIES_COVER).orEmpty()
         val categoryIdExtra = intent.getStringExtra(EXTRA_CATEGORY_ID).orEmpty()
+        val resumeEpisodeId = intent.getStringExtra(EXTRA_RESUME_EPISODE_ID).orEmpty()
+        val resumeFromIntent = intent.getLongExtra(EXTRA_RESUME_MS, -1L)
 
         StreamBridge.start()
         val engine = VlcEngine(this)
@@ -123,12 +126,15 @@ class SeriesActivity : ComponentActivity() {
             var position by remember { mutableLongStateOf(0L) }
             var duration by remember { mutableLongStateOf(0L) }
             var toast by remember { mutableStateOf<String?>(null) }
+            var nextEpisodeMsg by remember { mutableStateOf(false) }
             var hudVisible by remember { mutableStateOf(true) }
             var hudTick by remember { mutableIntStateOf(0) }
             var slotX by remember { mutableIntStateOf(0) }
             var slotY by remember { mutableIntStateOf(0) }
             var slotW by remember { mutableIntStateOf(0) }
             var slotH by remember { mutableIntStateOf(0) }
+            var pendingResume by remember { mutableLongStateOf(0L) }
+            var autoNextArmed by remember { mutableStateOf(true) }
             val playFocus = remember { FocusRequester() }
             val density = LocalDensity.current
 
@@ -137,16 +143,63 @@ class SeriesActivity : ComponentActivity() {
                 hudTick++
             }
 
-            fun playEpisode(ep: SeriesEpisode, expand: Boolean = false) {
+            fun persistProgress() {
+                val ep = selectedEpisode ?: return
+                if (seriesId.isBlank()) return
+                ContinueWatching.save(
+                    this@SeriesActivity,
+                    ContinueWatching.Item(
+                        kind = "series",
+                        id = seriesId,
+                        title = (info?.displayTitle?.takeIf { it.isNotBlank() } ?: seriesName)
+                            .ifBlank { "Serie" },
+                        poster = (info?.cover ?: seriesCoverExtra).ifBlank { null },
+                        positionMs = engine.timeMs(),
+                        durationMs = engine.lengthMs().coerceAtLeast(duration),
+                        episodeId = ep.id,
+                        episodeExt = ep.ext,
+                        season = ep.season,
+                        episodeNum = ep.episodeNum,
+                        categoryId = categoryIdExtra.ifBlank { null }
+                    )
+                )
+            }
+
+            fun playEpisode(ep: SeriesEpisode, expand: Boolean = false, resumeMs: Long = 0L) {
                 selectedEpisode = ep
+                selectedSeason = ep.season
+                autoNextArmed = true
+                pendingResume = resumeMs
                 val url = StreamBridge.maybeWrap(XtreamClient.seriesUrl(ep.id, ep.ext))
                 engine.playVod(url)
                 playing = true
                 if (expand) fullScreen = true
             }
 
+            fun nextEpisode(): SeriesEpisode? {
+                val keys = seasons.keys.toList()
+                val season = selectedSeason ?: return null
+                val eps = seasons[season].orEmpty()
+                val idx = eps.indexOfFirst { it.id == selectedEpisode?.id }
+                if (idx >= 0 && idx + 1 < eps.size) return eps[idx + 1]
+                val sIdx = keys.indexOf(season)
+                if (sIdx >= 0 && sIdx + 1 < keys.size) {
+                    return seasons[keys[sIdx + 1]]?.firstOrNull()
+                }
+                return null
+            }
+
+            fun goNextEpisode() {
+                if (!autoNextArmed) return
+                val next = nextEpisode() ?: return
+                autoNextArmed = false
+                nextEpisodeMsg = true
+                toast = "Cargando siguiente episodio…"
+                playEpisode(next, expand = true)
+            }
+
             fun openRelated(item: SeriesItem) {
-                // launchMode standard: nueva Activity con el contenido de esa serie
+                persistProgress()
                 startActivity(
                     Intent(this@SeriesActivity, SeriesActivity::class.java)
                         .putExtra(EXTRA_SERIES_ID, item.id)
@@ -164,24 +217,57 @@ class SeriesActivity : ComponentActivity() {
                 engine.onPlaying = {
                     playing = true
                     duration = engine.lengthMs()
+                    nextEpisodeMsg = false
+                    if (pendingResume > 0L) {
+                        val seek = pendingResume
+                        pendingResume = 0L
+                        engine.seekTo(seek)
+                    }
                 }
-                onDispose { engine.release() }
+                engine.onEnded = { goNextEpisode() }
+                onDispose {
+                    persistProgress()
+                    engine.release()
+                }
             }
 
             LaunchedEffect(seriesId) {
                 loading = true
                 error = null
+                nextEpisodeMsg = false
                 val detail = XtreamClient.seriesDetail(seriesId)
                 info = detail.info
                 seasons = detail.episodes
-                val first = detail.episodes.keys.firstOrNull()
-                selectedSeason = first
-                val firstEp = first?.let { detail.episodes[it]?.firstOrNull() }
-                selectedEpisode = firstEp
+                val saved = ContinueWatching.get(this@SeriesActivity, "series", seriesId)
+                val wantEpId = resumeEpisodeId.ifBlank { saved?.episodeId.orEmpty() }
+                val wantResume = when {
+                    resumeFromIntent > 0L -> resumeFromIntent
+                    !saved?.episodeId.isNullOrBlank() && saved?.episodeId == wantEpId ->
+                        saved?.positionMs ?: 0L
+                    else -> 0L
+                }
+
+                var startEp: SeriesEpisode? = null
+                if (wantEpId.isNotBlank()) {
+                    for ((season, eps) in detail.episodes) {
+                        val found = eps.firstOrNull { it.id == wantEpId }
+                        if (found != null) {
+                            selectedSeason = season
+                            startEp = found
+                            break
+                        }
+                    }
+                }
+                if (startEp == null) {
+                    val first = detail.episodes.keys.firstOrNull()
+                    selectedSeason = first
+                    startEp = first?.let { detail.episodes[it]?.firstOrNull() }
+                }
+                selectedEpisode = startEp
                 if (detail.episodes.isEmpty()) {
                     error = "No se encontraron episodios"
-                } else if (firstEp != null) {
-                    playEpisode(firstEp, expand = false)
+                } else if (startEp != null) {
+                    playEpisode(startEp, expand = false, resumeMs = wantResume)
                 }
 
                 val all = runCatching { XtreamClient.series() }.getOrDefault(emptyList())
@@ -221,7 +307,18 @@ class SeriesActivity : ComponentActivity() {
                     val len = engine.lengthMs()
                     if (len > 0) duration = len
                     playing = engine.isPlaying
+                    // Backup si EndReached no dispara
+                    if (autoNextArmed && len > 30_000L && position >= len - 1_200L && position > 0L) {
+                        goNextEpisode()
+                    }
                     delay(500)
+                }
+            }
+
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(5_000)
+                    persistProgress()
                 }
             }
 
@@ -233,7 +330,7 @@ class SeriesActivity : ComponentActivity() {
 
             LaunchedEffect(toast) {
                 if (toast == null) return@LaunchedEffect
-                delay(1800)
+                delay(if (nextEpisodeMsg) 3500 else 1800)
                 toast = null
             }
 
@@ -247,7 +344,10 @@ class SeriesActivity : ComponentActivity() {
             BackHandler {
                 when {
                     fullScreen -> fullScreen = false
-                    else -> finish()
+                    else -> {
+                        persistProgress()
+                        finish()
+                    }
                 }
             }
 
@@ -774,13 +874,13 @@ class SeriesActivity : ComponentActivity() {
                     Text(
                         msg,
                         color = Color.White,
-                        fontSize = 15.sp,
+                        fontSize = if (nextEpisodeMsg) 20.sp else 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
                             .align(Alignment.Center)
                             .zIndex(5f)
                             .background(Color(0xCC000000), RoundedCornerShape(10.dp))
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .padding(horizontal = 18.dp, vertical = 12.dp)
                     )
                 }
             }
@@ -792,6 +892,8 @@ class SeriesActivity : ComponentActivity() {
         const val EXTRA_SERIES_NAME = "series_name"
         const val EXTRA_SERIES_COVER = "series_cover"
         const val EXTRA_CATEGORY_ID = "category_id"
+        const val EXTRA_RESUME_EPISODE_ID = "resume_episode_id"
+        const val EXTRA_RESUME_MS = "resume_ms"
         const val EXTRA_USER = "user"
         const val EXTRA_PASS = "pass"
         const val EXTRA_SERVER = "server"

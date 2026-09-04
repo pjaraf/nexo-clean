@@ -26,6 +26,7 @@ class VlcEngine(context: Context) {
     var onPlaying: (() -> Unit)? = null
     var onError: (() -> Unit)? = null
     var onBuffering: ((Boolean) -> Unit)? = null
+    var onEnded: (() -> Unit)? = null
 
     private var layout: VLCVideoLayout? = null
     private var pending: Runnable? = null
@@ -34,6 +35,7 @@ class VlcEngine(context: Context) {
     private var released = false
     private var lastUrl: String? = null
     private var lastOpenAt = 0L
+    private var endedFiredForUrl: String? = null
 
     init {
         player.setEventListener { ev ->
@@ -47,6 +49,13 @@ class VlcEngine(context: Context) {
                 MediaPlayer.Event.Buffering -> {
                     val pct = ev.buffering
                     main.post { onBuffering?.invoke(pct < 92f) }
+                }
+                MediaPlayer.Event.EndReached -> main.post {
+                    val url = lastUrl
+                    if (url != null && endedFiredForUrl != url) {
+                        endedFiredForUrl = url
+                        onEnded?.invoke()
+                    }
                 }
                 MediaPlayer.Event.EncounteredError -> main.post { onError?.invoke() }
             }
@@ -304,6 +313,7 @@ class VlcEngine(context: Context) {
         if (released || url.isBlank()) return
         if (url == lastUrl && isPlayingSafe()) return
         lastUrl = url
+        endedFiredForUrl = null
         val myGen = ++gen
         pending?.let { main.removeCallbacks(it) }
         openRunnable?.let { main.removeCallbacks(it) }

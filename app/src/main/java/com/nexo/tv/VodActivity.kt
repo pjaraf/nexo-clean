@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
+import com.nexo.tv.data.ContinueWatching
 import com.nexo.tv.player.StreamBridge
 import com.nexo.tv.player.VlcEngine
 import kotlinx.coroutines.delay
@@ -81,6 +82,8 @@ class VodActivity : ComponentActivity() {
         val url = intent.getStringExtra(EXTRA_URL).orEmpty()
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val poster = intent.getStringExtra(EXTRA_POSTER).orEmpty()
+        val movieId = intent.getStringExtra(EXTRA_ID).orEmpty()
+        val resumeFromIntent = intent.getLongExtra(EXTRA_RESUME_MS, -1L)
         StreamBridge.start()
         val engine = VlcEngine(this)
 
@@ -91,6 +94,16 @@ class VodActivity : ComponentActivity() {
             var duration by remember { mutableLongStateOf(0L) }
             var toast by remember { mutableStateOf<String?>(null) }
             var hudTick by remember { mutableStateOf(0) }
+            var pendingResume by remember {
+                mutableLongStateOf(
+                    when {
+                        resumeFromIntent > 0L -> resumeFromIntent
+                        movieId.isNotBlank() ->
+                            ContinueWatching.get(this@VodActivity, "movie", movieId)?.positionMs ?: 0L
+                        else -> 0L
+                    }
+                )
+            }
             val rootFocus = remember { FocusRequester() }
             val playFocus = remember { FocusRequester() }
 
@@ -99,14 +112,37 @@ class VodActivity : ComponentActivity() {
                 hudTick++
             }
 
+            fun persistProgress() {
+                if (movieId.isBlank()) return
+                ContinueWatching.save(
+                    this@VodActivity,
+                    ContinueWatching.Item(
+                        kind = "movie",
+                        id = movieId,
+                        title = title.ifBlank { "Película" },
+                        poster = poster.ifBlank { null },
+                        positionMs = engine.timeMs(),
+                        durationMs = engine.lengthMs().coerceAtLeast(duration),
+                        url = url
+                    )
+                )
+            }
+
             DisposableEffect(engine) {
                 engine.onPlaying = {
                     playing = true
                     duration = engine.lengthMs()
+                    if (pendingResume > 0L) {
+                        val seek = pendingResume
+                        pendingResume = 0L
+                        engine.seekTo(seek)
+                    }
                 }
-                // HTTP directo: VLC puede seek con Range. HTTPS va por StreamBridge.
                 if (url.isNotBlank()) engine.playVod(StreamBridge.maybeWrap(url))
-                onDispose { engine.release() }
+                onDispose {
+                    persistProgress()
+                    engine.release()
+                }
             }
 
             LaunchedEffect(Unit) {
@@ -116,6 +152,13 @@ class VodActivity : ComponentActivity() {
                     if (len > 0) duration = len
                     playing = engine.isPlaying
                     delay(500)
+                }
+            }
+
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(5_000)
+                    persistProgress()
                 }
             }
 
@@ -141,7 +184,12 @@ class VodActivity : ComponentActivity() {
             }
 
             BackHandler {
-                if (showHud) showHud = false else finish()
+                if (showHud) {
+                    showHud = false
+                } else {
+                    persistProgress()
+                    finish()
+                }
             }
 
             Box(
@@ -357,6 +405,8 @@ class VodActivity : ComponentActivity() {
         const val EXTRA_URL = "url"
         const val EXTRA_TITLE = "title"
         const val EXTRA_POSTER = "poster"
+        const val EXTRA_ID = "id"
+        const val EXTRA_RESUME_MS = "resume_ms"
     }
 }
 
