@@ -84,6 +84,7 @@ fun HubScreen(onLogout: () -> Unit) {
                             Intent(ctx, VodActivity::class.java)
                                 .putExtra(VodActivity.EXTRA_URL, XtreamClient.movieUrl(item.id, item.ext ?: "mp4"))
                                 .putExtra(VodActivity.EXTRA_TITLE, item.displayName)
+                                .putExtra(VodActivity.EXTRA_POSTER, item.streamIcon.orEmpty())
                         )
                     }
                 )
@@ -115,6 +116,7 @@ fun HubScreen(onLogout: () -> Unit) {
                                     Intent(ctx, VodActivity::class.java)
                                         .putExtra(VodActivity.EXTRA_URL, XtreamClient.movieUrl(item.id, item.ext ?: "mp4"))
                                         .putExtra(VodActivity.EXTRA_TITLE, item.displayName)
+                                        .putExtra(VodActivity.EXTRA_POSTER, item.streamIcon.orEmpty())
                                 )
                             }
                         )

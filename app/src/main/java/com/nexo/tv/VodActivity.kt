@@ -25,11 +25,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
@@ -59,10 +61,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
 import com.nexo.tv.player.StreamBridge
 import com.nexo.tv.player.VlcEngine
 import kotlinx.coroutines.delay
@@ -74,6 +79,8 @@ class VodActivity : ComponentActivity() {
         enableEdgeToEdge()
         keepAwakeWhileVisible()
         val url = intent.getStringExtra(EXTRA_URL).orEmpty()
+        val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+        val poster = intent.getStringExtra(EXTRA_POSTER).orEmpty()
         StreamBridge.start()
         val engine = VlcEngine(this)
 
@@ -144,14 +151,11 @@ class VodActivity : ComponentActivity() {
                     .focusRequester(rootFocus)
                     .focusProperties { canFocus = !showHud }
                     .focusable()
-                    // Preview: solo intercepta teclas cuando el HUD está oculto
                     .onPreviewKeyEvent { e ->
                         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                         if (e.nativeKeyEvent.repeatCount > 0) return@onPreviewKeyEvent true
                         val code = e.nativeKeyEvent.keyCode
                         if (showHud) {
-                            // Con HUD visible: no robar DPAD (para moverse entre botones)
-                            // Solo teclas multimedia globales
                             when (code) {
                                 AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
                                     engine.togglePause(); playing = engine.isPlaying; bumpHud(); true
@@ -218,68 +222,116 @@ class VodActivity : ComponentActivity() {
                     exit = fadeOut(),
                     modifier = Modifier.align(Alignment.BottomCenter)
                 ) {
-                    Column(
+                    Row(
                         Modifier
                             .fillMaxWidth()
                             .focusGroup()
                             .background(
                                 Brush.verticalGradient(
-                                    listOf(Color.Transparent, Color(0xEE000000))
+                                    listOf(Color.Transparent, Color(0xE6000000))
                                 )
                             )
-                            .padding(horizontal = 28.dp, vertical = 22.dp)
+                            .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 10.dp),
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        val progress = if (duration > 0) {
-                            (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
-                        } else 0f
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
-                            color = Color(0xFFDE5B17),
-                            trackColor = Color.White.copy(alpha = 0.25f)
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(formatTime(position), color = Color.White, fontSize = 14.sp)
-                            Text(formatTime(duration), color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp)
-                        }
-                        Spacer(Modifier.height(14.dp))
-                        Row(
+                        // Carátula abajo a la izquierda
+                        Box(
                             Modifier
-                                .fillMaxWidth()
-                                .focusGroup(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
+                                .width(56.dp)
+                                .height(84.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.White.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
                         ) {
-                            HudButton(Icons.Filled.Replay10, "−10s") {
-                                engine.seekBy(-10_000); bumpHud()
+                            if (poster.isNotBlank()) {
+                                AsyncImage(
+                                    model = poster,
+                                    contentDescription = title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Filled.Movie,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.45f),
+                                    modifier = Modifier.size(28.dp)
+                                )
                             }
-                            HudButton(
-                                icon = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                label = if (playing) "Pausa" else "Play",
-                                focusRequester = playFocus
+                        }
+
+                        Column(Modifier.weight(1f)) {
+                            if (title.isNotBlank()) {
+                                Text(
+                                    title,
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(Modifier.height(4.dp))
+                            }
+                            val progress = if (duration > 0) {
+                                (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+                            } else 0f
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(3.dp)
+                                    .clip(RoundedCornerShape(2.dp)),
+                                color = Color(0xFFDE5B17),
+                                trackColor = Color.White.copy(alpha = 0.22f)
+                            )
+                            Spacer(Modifier.height(3.dp))
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                engine.togglePause()
-                                playing = engine.isPlaying
-                                bumpHud()
+                                Text(formatTime(position), color = Color.White, fontSize = 11.sp)
+                                Text(
+                                    formatTime(duration),
+                                    color = Color.White.copy(alpha = 0.65f),
+                                    fontSize = 11.sp
+                                )
                             }
-                            HudButton(Icons.Filled.Forward10, "+10s") {
-                                engine.seekBy(10_000); bumpHud()
-                            }
-                            HudButton(Icons.Filled.Translate, "Audio") {
-                                toast = engine.cycleAudioTrack() ?: "Sin pistas de audio"
-                                bumpHud()
-                            }
-                            HudButton(Icons.Filled.Subtitles, "Subs") {
-                                toast = engine.cycleSubtitleTrack()
-                                bumpHud()
-                            }
-                            HudButton(Icons.Filled.AspectRatio, "Pantalla") {
-                                toast = engine.cycleAspectMode()
-                                bumpHud()
+                            Spacer(Modifier.height(6.dp))
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .focusGroup(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.Start),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                HudButton(Icons.Filled.Replay10, "−10s") {
+                                    engine.seekBy(-10_000); bumpHud()
+                                }
+                                HudButton(
+                                    icon = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                    label = if (playing) "Pausa" else "Play",
+                                    focusRequester = playFocus
+                                ) {
+                                    engine.togglePause()
+                                    playing = engine.isPlaying
+                                    bumpHud()
+                                }
+                                HudButton(Icons.Filled.Forward10, "+10s") {
+                                    engine.seekBy(10_000); bumpHud()
+                                }
+                                HudButton(Icons.Filled.Translate, "Audio") {
+                                    toast = engine.cycleAudioTrack() ?: "Sin pistas de audio"
+                                    bumpHud()
+                                }
+                                HudButton(Icons.Filled.Subtitles, "Subs") {
+                                    toast = engine.cycleSubtitleTrack()
+                                    bumpHud()
+                                }
+                                HudButton(Icons.Filled.AspectRatio, "Pantalla") {
+                                    toast = engine.cycleAspectMode()
+                                    bumpHud()
+                                }
                             }
                         }
                     }
@@ -289,12 +341,12 @@ class VodActivity : ComponentActivity() {
                     Text(
                         text = msg,
                         color = Color.White,
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .background(Color(0xCC000000), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 18.dp, vertical = 10.dp)
+                            .background(Color(0xCC000000), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
             }
@@ -304,6 +356,7 @@ class VodActivity : ComponentActivity() {
     companion object {
         const val EXTRA_URL = "url"
         const val EXTRA_TITLE = "title"
+        const val EXTRA_POSTER = "poster"
     }
 }
 
@@ -318,24 +371,22 @@ private fun HudButton(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .size(60.dp)
+                .size(40.dp)
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-                .onFocusChanged {
-                    isFocused = it.isFocused
-                }
+                .onFocusChanged { isFocused = it.isFocused }
                 .clip(CircleShape)
-                .background(if (isFocused) Color(0xFFDE5B17) else Color.White.copy(alpha = 0.18f))
+                .background(if (isFocused) Color(0xFFDE5B17) else Color.White.copy(alpha = 0.16f))
                 .clickable(onClick = onClick)
                 .focusable(),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(28.dp))
+            Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(20.dp))
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
         Text(
             label,
-            color = if (isFocused) Color(0xFFFF6A1A) else Color.White.copy(alpha = 0.85f),
-            fontSize = 12.sp,
+            color = if (isFocused) Color(0xFFFF6A1A) else Color.White.copy(alpha = 0.8f),
+            fontSize = 10.sp,
             fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Normal
         )
     }
