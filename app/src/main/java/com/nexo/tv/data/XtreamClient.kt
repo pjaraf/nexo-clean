@@ -120,10 +120,22 @@ object XtreamClient {
         return runCatching { gson.fromJson<List<VodItem>>(json, type) }.getOrNull().orEmpty()
     }
 
+    suspend fun vodCategories(): List<LiveCategory> {
+        val json = fetch("get_vod_categories") ?: return emptyList()
+        val type = object : TypeToken<List<LiveCategory>>() {}.type
+        return runCatching { gson.fromJson<List<LiveCategory>>(json, type) }.getOrNull().orEmpty()
+    }
+
     suspend fun series(): List<SeriesItem> {
         val json = fetch("get_series") ?: return emptyList()
         val type = object : TypeToken<List<SeriesItem>>() {}.type
         return runCatching { gson.fromJson<List<SeriesItem>>(json, type) }.getOrNull().orEmpty()
+    }
+
+    suspend fun seriesCategories(): List<LiveCategory> {
+        val json = fetch("get_series_categories") ?: return emptyList()
+        val type = object : TypeToken<List<LiveCategory>>() {}.type
+        return runCatching { gson.fromJson<List<LiveCategory>>(json, type) }.getOrNull().orEmpty()
     }
 
     /**

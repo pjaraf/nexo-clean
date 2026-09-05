@@ -7,6 +7,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Logout
@@ -48,12 +50,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,6 +70,7 @@ import com.nexo.tv.MovieActivity
 import com.nexo.tv.SeriesActivity
 import com.nexo.tv.Session
 import com.nexo.tv.data.Catalog
+import com.nexo.tv.data.CategoryShelf
 import com.nexo.tv.data.SeriesItem
 import com.nexo.tv.data.VodItem
 import kotlinx.coroutines.delay
@@ -161,10 +166,11 @@ fun HubScreen(onLogout: () -> Unit) {
                 )
                 Tab.SERIES -> Box(
                     Modifier
-                        .padding(start = 88.dp, top = 12.dp, end = 16.dp, bottom = 12.dp)
+                        .padding(start = 88.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)
                         .fillMaxSize()
                 ) {
-                    if (series.isEmpty()) {
+                    val shelves = Catalog.seriesShelves
+                    if (shelves.isEmpty()) {
                         Text(
                             "No hay series en el catálogo",
                             color = Color.White.copy(alpha = 0.75f),
@@ -172,32 +178,29 @@ fun HubScreen(onLogout: () -> Unit) {
                             modifier = Modifier.align(Alignment.Center)
                         )
                     } else {
-                        PosterGrid(
-                            items = series.map { it.id to (it.cover to it.name) },
-                            onClick = { id ->
-                                series.find { it.id == id }?.let { openSeries(it) }
-                            }
+                        CategoryBrowser(
+                            shelves = shelves,
+                            onPoster = { id -> series.find { it.id == id }?.let { openSeries(it) } }
                         )
                     }
                 }
                 Tab.MOVIES -> Box(
                     Modifier
-                        .padding(start = 88.dp, top = 12.dp, end = 16.dp, bottom = 12.dp)
+                        .padding(start = 88.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)
                         .fillMaxSize()
                 ) {
-                    if (movies2026.isEmpty()) {
+                    val shelves = Catalog.movieShelves
+                    if (shelves.isEmpty()) {
                         Text(
-                            "No hay películas de 2026",
+                            "No hay películas en el catálogo",
                             color = Color.White.copy(alpha = 0.75f),
                             fontSize = 18.sp,
                             modifier = Modifier.align(Alignment.Center)
                         )
                     } else {
-                        PosterGrid(
-                            items = movies2026.map { it.id to (it.streamIcon to it.displayName) },
-                            onClick = { id ->
-                                movies2026.find { it.id == id }?.let { openMovie(it) }
-                            }
+                        CategoryBrowser(
+                            shelves = shelves,
+                            onPoster = { id -> movies.find { it.id == id }?.let { openMovie(it) } }
                         )
                     }
                 }
@@ -361,6 +364,196 @@ private fun HomePane(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CategoryBrowser(
+    shelves: List<CategoryShelf>,
+    onPoster: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf<CategoryShelf?>(null) }
+
+    val open = expanded
+    if (open != null) {
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .padding(start = 8.dp, bottom = 8.dp)
+                    .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.03f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Orange.copy(alpha = 0.92f))
+                    .clickable { expanded = null }
+                    .focusable()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Volver · ${open.name}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            }
+            PosterGrid(
+                items = open.posters.map { it.id to (it.cover to it.title) },
+                onClick = onPoster
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            items(shelves, key = { it.id }) { shelf ->
+                CategoryShelfRow(
+                    shelf = shelf,
+                    onPoster = onPoster,
+                    onSeeAll = { expanded = shelf }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryShelfRow(
+    shelf: CategoryShelf,
+    onPoster: (String) -> Unit,
+    onSeeAll: () -> Unit
+) {
+    val previewCount = 7
+    val preview = remember(shelf) { shelf.posters.take(previewCount) }
+    val rowState = rememberLazyListState()
+    var seeAllFocused by remember { mutableStateOf(false) }
+
+    LaunchedEffect(seeAllFocused) {
+        if (seeAllFocused) {
+            rowState.animateScrollToItem(preview.size)
+        }
+    }
+
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            text = shelf.name,
+            color = Color.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp, end = 8.dp)
+        )
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // 7 carátulas visibles + la 8.ª apenas asomada hasta que llega el foco.
+            val gap = 8.dp
+            val visibleSlots = 7.28f
+            val posterW = (maxWidth - gap * 7) / visibleSlots
+            val posterH = posterW * 3f / 2f
+
+            LazyRow(
+                state = rowState,
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                contentPadding = PaddingValues(horizontal = 8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(preview, key = { it.id }) { poster ->
+                    Poster(
+                        url = poster.cover,
+                        title = poster.title,
+                        modifier = Modifier
+                            .width(posterW)
+                            .height(posterH)
+                            .tvFocus(shape = RoundedCornerShape(8.dp), focusedScale = 1.04f)
+                            .clickable { onPoster(poster.id) }
+                            .focusable()
+                    )
+                }
+                item(key = "see-all-${shelf.id}") {
+                    SeeAllCategoryCard(
+                        backdrop = shelf.posters.getOrNull(previewCount)?.cover
+                            ?: shelf.posters.firstOrNull()?.cover,
+                        categoryName = shelf.name,
+                        modifier = Modifier
+                            .width(posterW)
+                            .height(posterH),
+                        onFocused = { seeAllFocused = it },
+                        onClick = onSeeAll
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeeAllCategoryCard(
+    backdrop: String?,
+    categoryName: String,
+    modifier: Modifier = Modifier,
+    onFocused: (Boolean) -> Unit,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.05f)
+            .clip(RoundedCornerShape(10.dp))
+            .onFocusChanged { onFocused(it.isFocused) }
+            .clickable(onClick = onClick)
+            .focusable()
+    ) {
+        AsyncImage(
+            model = backdrop,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFFFF7A18).copy(alpha = 0.92f),
+                            Color(0xFFDE5B17).copy(alpha = 0.95f),
+                            Color(0xFF3A1208).copy(alpha = 0.98f)
+                        )
+                    )
+                )
+        )
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(10.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Ver categoría",
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                "completa",
+                color = Color.White.copy(alpha = 0.95f),
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                categoryName,
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 11.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
