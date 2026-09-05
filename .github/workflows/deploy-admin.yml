@@ -3,13 +3,10 @@ name: Deploy Admin Panel to GitHub Pages
 on:
   push:
     branches: [main]
-    paths:
-      - 'docs/**'
-      - 'nexo-config.json'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -30,6 +27,29 @@ jobs:
       - name: Copy config to docs for public web access
         run: |
           cp nexo-config.json docs/nexo-config.json
+          touch docs/.nojekyll
+
+      - name: Enable Pages via GitHub API
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          api="https://api.github.com/repos/${{ github.repository }}/pages"
+          echo "Checking/Enabling GitHub Pages..."
+          status_code=$(curl -s -o /tmp/pages_resp.json -w "%{http_code}" -X POST "$api" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -d '{"build_type":"workflow"}')
+          echo "POST /pages HTTP status: $status_code"
+          cat /tmp/pages_resp.json || true
+          if [ "$status_code" = "409" ] || [ "$status_code" = "422" ]; then
+            echo "Pages already exists, ensuring build_type is workflow..."
+            curl -s -X PUT "$api" \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              -d '{"build_type":"workflow"}' || true
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
