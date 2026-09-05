@@ -5,6 +5,8 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import com.google.gson.Gson
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import com.google.gson.annotations.SerializedName
 import com.nexo.tv.Session
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +56,7 @@ data class AccessCodeDto(
 object CodeAuth {
     private const val TAG = "CodeAuth"
     private const val RTDB_BASE = "https://nexo-tv-d8766-default-rtdb.firebaseio.com"
+    private const val FIRESTORE_BASE = "https://firestore.googleapis.com/v1/projects/jetgo-f0127/databases/(default)/documents/access_codes"
     private val gson = Gson()
 
     suspend fun validateAndLogin(rawCode: String, context: Context): CodeAuthResult = withContext(Dispatchers.IO) {
@@ -62,42 +65,41 @@ object CodeAuth {
             return@withContext CodeAuthResult.Error("El código debe tener exactamente 6 dígitos.")
         }
 
-        val url = "$RTDB_BASE/codes/$clean.json"
-        Log.i(TAG, "Consultando código $clean en $url")
+        Log.i(TAG, "Iniciando validación de código: $clean")
 
-        val docJson: String = try {
-            val req = Request.Builder()
-                .url(url)
-                .header("Accept", "application/json")
-                .build()
-            Http.client.newCall(req).execute().use { res ->
-                if (!res.isSuccessful) {
-                    return@withContext CodeAuthResult.Error("Error al contactar el servidor (${res.code}).")
+        // 1. Intentar primero en Firebase Realtime Database
+        var data: AccessCodeDto? = fetchFromRtdb(clean)
+
+        // 2. Si no está en RTDB, consultar en Firestore (proyecto JetGo / Nexo)
+        if (data == null) {
+            Log.i(TAG, "Código no encontrado en RTDB, buscando en Firestore...")
+            data = fetchFromFirestore(clean)
+            if (data != null) {
+                // Sincronizar en background a RTDB para acceso instantáneo futuro
+                val toSync = data
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val json = gson.toJson(toSync)
+                        val req = Request.Builder()
+                            .url("$RTDB_BASE/codes/$clean.json")
+                            .put(json.toRequestBody("application/json; charset=utf-8".toMediaType()))
+                            .build()
+                        Http.client.newCall(req).execute().close()
+                    } catch (_: Throwable) {}
                 }
-                res.body?.string().orEmpty()
             }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Fallo de red al verificar código: ${e.message}")
-            return@withContext CodeAuthResult.Error("Sin conexión a internet. Revisa tu red.")
         }
 
-        if (docJson.isBlank() || docJson == "null") {
+        if (data == null) {
             return@withContext CodeAuthResult.Error("Código no encontrado. Verifica los 6 dígitos.")
         }
 
-        val data: AccessCodeDto = try {
-            gson.fromJson(docJson, AccessCodeDto::class.java)
-        } catch (e: Throwable) {
-            Log.e(TAG, "Error deserializando código: ${e.message}")
-            return@withContext CodeAuthResult.Error("Error al procesar los datos del código.")
-        }
-
-        // 1. Verificar si está activo
+        // 3. Verificar si está activo
         if (data.active == false) {
             return@withContext CodeAuthResult.Error("Este código ha sido revocado o suspendido.")
         }
 
-        // 2. Verificar fecha de vencimiento
+        // 4. Verificar fecha de vencimiento
         val exp = data.expirationDate?.trim().orEmpty()
         if (exp.isNotBlank() && exp != "null") {
             try {
@@ -108,7 +110,7 @@ object CodeAuth {
             } catch (_: Throwable) {}
         }
 
-        // 3. Verificar demo
+        // 5. Verificar demo
         if (data.isDemo == true && data.demoExpiresAt != null) {
             val expireMs: Long? = when (val d = data.demoExpiresAt) {
                 is Number -> d.toLong()
@@ -128,16 +130,26 @@ object CodeAuth {
             }
         }
 
-        // 4. Extraer credenciales Xtream
+        // 6. Extraer credenciales Xtream (priorizando fuentes con usuario y contraseña)
         var host = data.host?.trim().orEmpty()
         var username = data.username?.trim().orEmpty()
         var password = data.password?.trim().orEmpty()
 
-        if ((username.isBlank() || password.isBlank()) && !data.sources.isNullOrEmpty()) {
-            val first = data.sources.first()
-            if (host.isBlank()) host = first.host?.trim().orEmpty()
-            if (username.isBlank()) username = first.username?.trim().orEmpty()
-            if (password.isBlank()) password = first.password?.trim().orEmpty()
+        if (username.isBlank() || password.isBlank()) {
+            val sources = data.sources.orEmpty()
+            // Primero buscar fuente explícitamente Xtream con credenciales
+            val xtreamSrc = sources.firstOrNull {
+                (it.type == null || it.type.equals("xtream", ignoreCase = true)) &&
+                        !it.username.isNullOrBlank() && !it.password.isNullOrBlank()
+            } ?: sources.firstOrNull {
+                !it.username.isNullOrBlank() && !it.password.isNullOrBlank()
+            }
+
+            if (xtreamSrc != null) {
+                if (username.isBlank()) username = xtreamSrc.username.orEmpty().trim()
+                if (password.isBlank()) password = xtreamSrc.password.orEmpty().trim()
+                if (host.isBlank()) host = xtreamSrc.host.orEmpty().trim()
+            }
         }
 
         if (host.isBlank()) {
@@ -148,14 +160,14 @@ object CodeAuth {
             return@withContext CodeAuthResult.Error("El código no tiene credenciales de acceso asignadas.")
         }
 
-        // 5. Iniciar sesión en el servidor Xtream
-        Log.i(TAG, "Conectando Xtream con servidor=$host, usuario=$username")
+        // 7. Iniciar sesión en el servidor Xtream
+        Log.i(TAG, "Conectando al servidor Xtream ($host)")
         val ok = XtreamClient.login(username, password, preferredServer = host)
         if (!ok) {
-            return@withContext CodeAuthResult.Error("No se pudo iniciar sesión en el servidor. Intenta de nuevo.")
+            return@withContext CodeAuthResult.Error("No se pudo conectar al servidor. Intenta nuevamente.")
         }
 
-        // 6. Guardar sesión
+        // 8. Guardar sesión completa en almacenamiento seguro
         Session.loginWithCode(
             code = clean,
             user = username,
@@ -168,10 +180,97 @@ object CodeAuth {
             series = data.allowSeries ?: true
         )
 
-        // 7. Notificar dispositivo en línea a Firebase en background
+        // 9. Notificar actividad del dispositivo en background
         reportDeviceActivity(clean, context)
 
         CodeAuthResult.Success(data.clientName.orEmpty())
+    }
+
+    private fun fetchFromRtdb(code: String): AccessCodeDto? {
+        return try {
+            val req = Request.Builder()
+                .url("$RTDB_BASE/codes/$code.json")
+                .header("Accept", "application/json")
+                .build()
+            Http.client.newCall(req).execute().use { res ->
+                if (!res.isSuccessful) return null
+                val body = res.body?.string().orEmpty()
+                if (body.isBlank() || body == "null") return null
+                gson.fromJson(body, AccessCodeDto::class.java)
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "Error consultando RTDB: ${e.message}")
+            null
+        }
+    }
+
+    private fun fetchFromFirestore(code: String): AccessCodeDto? {
+        return try {
+            val req = Request.Builder()
+                .url("$FIRESTORE_BASE/$code")
+                .header("Accept", "application/json")
+                .build()
+            Http.client.newCall(req).execute().use { res ->
+                if (!res.isSuccessful) return null
+                val body = res.body?.string().orEmpty()
+                if (body.isBlank() || body == "null") return null
+
+                val root = JsonParser.parseString(body).asJsonObject
+                val fields = root.getAsJsonObject("fields") ?: return null
+
+                fun str(name: String): String? =
+                    fields.getAsJsonObject(name)?.get("stringValue")?.asString?.takeIf { it.isNotBlank() }
+
+                fun bool(name: String, default: Boolean = true): Boolean =
+                    fields.getAsJsonObject(name)?.get("booleanValue")?.asBoolean ?: default
+
+                val sources = mutableListOf<CodeSourceDto>()
+                val sourcesArr = fields.getAsJsonObject("sources")
+                    ?.getAsJsonObject("arrayValue")
+                    ?.getAsJsonArray("values")
+
+                sourcesArr?.forEach { elem ->
+                    val sFields = elem.asJsonObject.getAsJsonObject("mapValue")?.getAsJsonObject("fields")
+                    if (sFields != null) {
+                        fun sStr(n: String): String? =
+                            sFields.getAsJsonObject(n)?.get("stringValue")?.asString?.takeIf { it.isNotBlank() }
+
+                        sources.add(
+                            CodeSourceDto(
+                                type = sStr("type"),
+                                serverId = sStr("serverId"),
+                                host = sStr("host"),
+                                username = sStr("username"),
+                                password = sStr("password"),
+                                m3uUrl = sStr("m3uUrl")
+                            )
+                        )
+                    }
+                }
+
+                AccessCodeDto(
+                    code = code,
+                    active = bool("active", true),
+                    clientName = str("clientName"),
+                    clientPhone = str("clientPhone"),
+                    mode = str("mode"),
+                    host = str("host"),
+                    username = str("username"),
+                    password = str("password"),
+                    m3uUrl = str("m3uUrl"),
+                    sources = sources,
+                    expirationDate = str("expirationDate"),
+                    isDemo = bool("isDemo", false),
+                    demoExpiresAt = fields.getAsJsonObject("demoExpiresAt")?.get("timestampValue")?.asString,
+                    allowTv = bool("allowTv", true),
+                    allowMovies = bool("allowMovies", true),
+                    allowSeries = bool("allowSeries", true)
+                )
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "Error consultando Firestore: ${e.message}")
+            null
+        }
     }
 
     private fun reportDeviceActivity(code: String, context: Context) {
@@ -182,7 +281,7 @@ object CodeAuth {
                 val nowMs = System.currentTimeMillis()
                 val jsonType = "application/json; charset=utf-8".toMediaType()
 
-                // Actualizar timestamp de actividad
+                // Actualizar timestamp de actividad en RTDB
                 val actUrl = "$RTDB_BASE/codes/$code/deviceActivity/$deviceId.json"
                 val actReq = Request.Builder()
                     .url(actUrl)
@@ -190,7 +289,7 @@ object CodeAuth {
                     .build()
                 Http.client.newCall(actReq).execute().close()
 
-                // Actualizar nombre del dispositivo
+                // Actualizar nombre del dispositivo en RTDB
                 val nameUrl = "$RTDB_BASE/codes/$code/deviceNames/$deviceId.json"
                 val nameReq = Request.Builder()
                     .url(nameUrl)
@@ -198,7 +297,7 @@ object CodeAuth {
                     .build()
                 Http.client.newCall(nameReq).execute().close()
 
-                Log.i(TAG, "Dispositivo $deviceName ($deviceId) registrado para código $code")
+                Log.i(TAG, "Dispositivo $deviceName ($deviceId) reportado en tiempo real para código $code")
             } catch (e: Throwable) {
                 Log.w(TAG, "No se pudo reportar actividad del dispositivo: ${e.message}")
             }
