@@ -68,12 +68,12 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import coil.compose.AsyncImage
 import com.nexo.tv.data.LiveCategory
 import com.nexo.tv.data.LiveChannel
 import com.nexo.tv.data.XtreamClient
 import com.nexo.tv.player.StreamBridge
 import com.nexo.tv.player.VlcEngine
+import com.nexo.tv.ui.PosterImage
 import kotlinx.coroutines.delay
 import org.videolan.libvlc.util.VLCVideoLayout
 
@@ -557,23 +557,14 @@ private fun ChannelSideBanner(
             contentAlignment = Alignment.Center
         ) {
             val icon = channel.streamIcon
-            if (!icon.isNullOrBlank()) {
-                AsyncImage(
-                    model = icon,
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(6.dp)
-                )
-            } else {
-                Text(
-                    text = "%03d".format(number),
-                    color = Color(0xFFDE5B17),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-            }
+            PosterImage(
+                url = icon,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(6.dp)
+            )
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.widthIn(max = 220.dp)) {

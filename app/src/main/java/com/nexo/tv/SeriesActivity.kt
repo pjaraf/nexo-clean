@@ -81,7 +81,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
-import coil.compose.AsyncImage
+import com.nexo.tv.ui.PosterImage
 import com.nexo.tv.data.ContinueWatching
 import com.nexo.tv.data.SeriesDetailInfo
 import com.nexo.tv.data.SeriesEpisode
@@ -515,8 +515,8 @@ class SeriesActivity : ComponentActivity() {
                 )
 
                 if (!fullScreen) {
-                    AsyncImage(
-                        model = backdrop ?: cover,
+                    PosterImage(
+                        url = backdrop ?: cover,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize().zIndex(0f)
@@ -577,8 +577,8 @@ class SeriesActivity : ComponentActivity() {
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.Top
                             ) {
-                                AsyncImage(
-                                    model = cover,
+                                PosterImage(
+                                    url = cover,
                                     contentDescription = title,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
@@ -831,8 +831,8 @@ class SeriesActivity : ComponentActivity() {
                                 ) {
                                     items(recommended, key = { it.id }) { item ->
                                         var focused by remember { mutableStateOf(false) }
-                                        AsyncImage(
-                                            model = item.cover,
+                                        PosterImage(
+                                            url = item.cover,
                                             contentDescription = item.name,
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier
@@ -900,8 +900,8 @@ class SeriesActivity : ComponentActivity() {
                                 verticalAlignment = Alignment.Bottom,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                AsyncImage(
-                                    model = cover,
+                                PosterImage(
+                                    url = cover,
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier

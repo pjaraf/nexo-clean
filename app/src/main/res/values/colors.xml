@@ -1,4 +1,5 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="nexo_orange">#FFDE5B17</color>
+    <color name="ic_launcher_background">#FF0B0608</color>
 </resources>

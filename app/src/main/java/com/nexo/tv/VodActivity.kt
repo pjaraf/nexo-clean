@@ -31,7 +31,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Forward10
-import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
@@ -68,10 +67,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import coil.compose.AsyncImage
 import com.nexo.tv.data.ContinueWatching
 import com.nexo.tv.player.StreamBridge
 import com.nexo.tv.player.VlcEngine
+import com.nexo.tv.ui.PosterImage
 import com.nexo.tv.ui.ResumePrompt
 import kotlinx.coroutines.delay
 import org.videolan.libvlc.util.VLCVideoLayout
@@ -308,25 +307,15 @@ class VodActivity : ComponentActivity() {
                             Modifier
                                 .width(56.dp)
                                 .height(84.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color.White.copy(alpha = 0.12f)),
+                                .clip(RoundedCornerShape(6.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (poster.isNotBlank()) {
-                                AsyncImage(
-                                    model = poster,
-                                    contentDescription = title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Filled.Movie,
-                                    contentDescription = null,
-                                    tint = Color.White.copy(alpha = 0.45f),
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
+                            PosterImage(
+                                url = poster,
+                                contentDescription = title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
 
                         Column(Modifier.weight(1f)) {

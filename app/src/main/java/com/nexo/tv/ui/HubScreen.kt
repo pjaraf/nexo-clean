@@ -63,7 +63,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import coil.compose.AsyncImage
 import com.nexo.tv.AppExit
 import com.nexo.tv.LiveActivity
 import com.nexo.tv.MovieActivity
@@ -498,8 +497,8 @@ private fun SeeAllCategoryCard(
             .clickable(onClick = onClick)
             .focusable()
     ) {
-        AsyncImage(
-            model = backdrop,
+        PosterImage(
+            url = backdrop,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
@@ -663,8 +662,8 @@ private fun PosterPage(
 
 @Composable
 private fun Poster(url: String?, title: String, modifier: Modifier = Modifier) {
-    AsyncImage(
-        model = url,
+    PosterImage(
+        url = url,
         contentDescription = title,
         contentScale = ContentScale.Crop,
         modifier = modifier.clip(RoundedCornerShape(8.dp))
