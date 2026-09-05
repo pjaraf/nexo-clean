@@ -716,15 +716,19 @@ private fun HomePane(
     onPositionSlot: (x: Int, y: Int, w: Int, h: Int) -> Unit,
     onMovie: (VodItem) -> Unit
 ) {
+    var featured by remember(movies) { mutableStateOf(movies.firstOrNull()) }
+    val playerHeight = 188.dp
+    val playerWidth = 334.dp // 16:9 con altura de 188.dp (188 * 16 / 9)
+
     Column(
         Modifier
             .fillMaxSize()
-            .padding(start = 88.dp, end = 20.dp, top = 26.dp, bottom = 14.dp)
+            .padding(start = 88.dp, end = 20.dp, top = 22.dp, bottom = 12.dp)
     ) {
-        Text("NEXO", color = Orange, fontSize = 32.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.height(16.dp))
+        Text("NEXO", color = Orange, fontSize = 30.sp, fontWeight = FontWeight.Black)
+        Spacer(Modifier.height(14.dp))
 
-        // Fila Hero: Mini reproductor de TV en vivo + información y botón de expandir
+        // Fila Hero: Mini reproductor de TV en vivo + información y botón + Carátula al lado derecho
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -732,8 +736,8 @@ private fun HomePane(
             // Ranura (Slot) del mini reproductor 16:9
             Box(
                 Modifier
-                    .width(360.dp)
-                    .aspectRatio(16f / 9f)
+                    .width(playerWidth)
+                    .height(playerHeight)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xFF141418))
                     .onGloballyPositioned { coords ->
@@ -747,15 +751,20 @@ private fun HomePane(
                     }
             )
 
-            Spacer(Modifier.width(24.dp))
+            Spacer(Modifier.width(18.dp))
 
-            // Información del canal y botón TV en vivo
-            Column(Modifier.weight(1f)) {
+            // Información del canal y botón TV en vivo (centro)
+            Column(
+                Modifier
+                    .weight(1f)
+                    .height(playerHeight),
+                verticalArrangement = Arrangement.Center
+            ) {
                 if (categoryName.isNotBlank()) {
                     Text(
                         text = categoryName.uppercase(),
                         color = Orange,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
                         maxLines = 1,
@@ -766,7 +775,7 @@ private fun HomePane(
                 Text(
                     text = currentChannel?.name ?: "Cargando TV en vivo…",
                     color = Color.White,
-                    fontSize = 26.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -776,11 +785,11 @@ private fun HomePane(
                     Text(
                         text = "Canal %03d".format(channelNumber),
                         color = Color.White.copy(alpha = 0.65f),
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
                 var btnFocused by remember { mutableStateOf(false) }
                 Row(
                     Modifier
@@ -797,34 +806,53 @@ private fun HomePane(
                         )
                         .clickable { onExpandLive() }
                         .focusable()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                        .padding(horizontal = 22.dp, vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Filled.Tv,
                         contentDescription = null,
                         tint = if (btnFocused) Color.Black else Color.White,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         "TV en vivo",
                         color = if (btnFocused) Color.Black else Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp
+                        fontSize = 16.sp
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(18.dp))
+
+            // Carátula al lado derecho como antes con el mismo alto que el reproductor
+            // y el ancho para que se vea la carátula completa
+            featured?.let { movie ->
+                Box(
+                    Modifier
+                        .height(playerHeight)
+                        .aspectRatio(2f / 3f)
+                        .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF1B1B22))
+                        .clickable { onMovie(movie) }
+                        .focusable(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    PosterImage(
+                        url = movie.streamIcon,
+                        contentDescription = movie.displayName,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
         }
 
-        Spacer(Modifier.height(20.dp))
-        Text(
-            "Películas 2026",
-            color = Color.White,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.weight(1f))
+
         if (movies.isEmpty()) {
             Text(
                 "No hay películas de 2026 en el catálogo",
@@ -834,7 +862,7 @@ private fun HomePane(
             )
         } else {
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 14.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(movies, key = { it.id }) { m ->
@@ -845,6 +873,7 @@ private fun HomePane(
                             .width(PosterW)
                             .height(PosterH)
                             .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
+                            .onFocusChanged { if (it.isFocused) featured = m }
                             .clickable { onMovie(m) }
                             .focusable()
                     )
