@@ -3,8 +3,10 @@ package com.nexo.tv.update
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
@@ -71,6 +73,15 @@ object AppUpdater {
             val url = info.apkUrl.ifBlank {
                 "https://github.com/pjaraf/nexo-clean/releases/latest/download/app-release.apk"
             }
+            val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                ?: context.externalCacheDir
+                ?: context.cacheDir
+            if (!dir.exists()) dir.mkdirs()
+
+            val tempFile = File(dir, "nexo-update.apk.tmp")
+            val finalFile = File(dir, "nexo-update.apk")
+            if (tempFile.exists()) tempFile.delete()
+
             try {
                 val req = Request.Builder().url(url).build()
                 Http.client.newCall(req).execute().use { res ->
@@ -80,24 +91,44 @@ object AppUpdater {
                     }
                     val body = res.body ?: return@withContext null
                     val total = body.contentLength()
-                    val out = File(context.cacheDir, "nexo-update.apk")
+
                     body.byteStream().use { input ->
-                        FileOutputStream(out).use { output ->
-                            val buf = ByteArray(16 * 1024)
+                        FileOutputStream(tempFile).use { output ->
+                            val buf = ByteArray(32 * 1024)
                             var read = 0L
                             while (true) {
                                 val n = input.read(buf)
                                 if (n <= 0) break
                                 output.write(buf, 0, n)
                                 read += n
-                                if (total > 0) onProgress(((read * 100) / total).toInt())
+                                if (total > 0) onProgress(((read * 100) / total).toInt().coerceIn(0, 100))
+                            }
+                            output.flush()
+
+                            if (total > 0 && read < total) {
+                                Log.e(TAG, "download incomplete: read $read of $total")
+                                tempFile.delete()
+                                return@withContext null
+                            }
+                            if (read < 1024 * 1024) {
+                                Log.e(TAG, "download too small: $read bytes")
+                                tempFile.delete()
+                                return@withContext null
                             }
                         }
                     }
-                    out
+
+                    if (finalFile.exists()) finalFile.delete()
+                    if (!tempFile.renameTo(finalFile)) {
+                        tempFile.copyTo(finalFile, overwrite = true)
+                        tempFile.delete()
+                    }
+                    finalFile.setReadable(true, false)
+                    finalFile
                 }
             } catch (e: Throwable) {
                 Log.e(TAG, "download error", e)
+                tempFile.delete()
                 null
             }
         }
@@ -130,13 +161,36 @@ object AppUpdater {
         }
     }
 
-    fun install(context: Context, apk: File) {
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    fun install(context: Context, apk: File): Boolean {
+        return try {
+            apk.setReadable(true, false)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            val pm = context.packageManager
+            val resolveList = pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            for (resolveInfo in resolveList) {
+                val pkg = resolveInfo.activityInfo.packageName
+                context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            listOf(
+                "com.google.android.packageinstaller",
+                "com.android.packageinstaller"
+            ).forEach { pkg ->
+                try {
+                    context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (_: Throwable) {}
+            }
+
+            context.startActivity(intent)
+            true
+        } catch (e: Throwable) {
+            Log.e(TAG, "install error", e)
+            false
         }
-        context.startActivity(intent)
     }
 }

@@ -10,10 +10,10 @@ android {
 
     defaultConfig {
         applicationId = "com.nexo.tv"
-        minSdk = 24
+        minSdk = 21
         targetSdk = 35
-        versionCode = 2102
-        versionName = "2.2.48"
+        versionCode = 2103
+        versionName = "2.2.49"
         ndk {
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
         }
@@ -31,6 +31,8 @@ android {
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
+            enableV1Signing = true
+            enableV2Signing = true
         }
     }
 

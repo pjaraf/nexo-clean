@@ -62,10 +62,13 @@ fun UpdateGate(enabled: Boolean = true) {
         val file = AppUpdater.download(ctx, currentInfo) { progress = it }
         downloading = false
         if (file == null) {
-            status = "No se pudo descargar la actualización"
+            status = "No se pudo descargar la actualización completa"
         } else {
             status = "Abriendo instalador…"
-            AppUpdater.install(ctx, file)
+            val ok = AppUpdater.install(ctx, file)
+            if (!ok) {
+                status = "No se pudo abrir el instalador del paquete"
+            }
         }
     }
 
