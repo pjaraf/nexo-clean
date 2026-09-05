@@ -94,9 +94,7 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
-                if (screen == AppScreen.Login || screen == AppScreen.Hub) {
-                    UpdateGate()
-                }
+                UpdateGate()
             }
         }
     }

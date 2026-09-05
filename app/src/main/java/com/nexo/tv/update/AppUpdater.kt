@@ -110,11 +110,23 @@ object AppUpdater {
 
     fun openInstallPermission(activity: Activity) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                Uri.parse("package:${activity.packageName}")
-            )
-            activity.startActivity(intent)
+            try {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:${activity.packageName}")
+                )
+                activity.startActivity(intent)
+            } catch (_: Throwable) {
+                try {
+                    activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES))
+                } catch (_: Throwable) {
+                    try {
+                        activity.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+                    } catch (e: Throwable) {
+                        Log.w(TAG, "Cannot open install permission settings", e)
+                    }
+                }
+            }
         }
     }
 

@@ -33,7 +33,7 @@ jobs:
       - name: Compute version
         id: ver
         run: |
-          CODE=$((1000 + ${{ github.run_number }}))
+          CODE=$((2000 + ${{ github.run_number }}))
           NAME="2.2.${{ github.run_number }}"
           TAG="v$NAME"
           echo "version_code=$CODE" >> "$GITHUB_OUTPUT"
@@ -45,7 +45,7 @@ jobs:
             "versionName": "$NAME",
             "apkUrl": "https://github.com/pjaraf/nexo-clean/releases/download/$TAG/app-release.apk",
             "changelog": "Actualización automática Nexo TV $NAME",
-            "mandatory": false
+            "mandatory": true
           }
           EOF
           # Patch app version for this build
