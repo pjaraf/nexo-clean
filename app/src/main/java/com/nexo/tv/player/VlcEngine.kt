@@ -28,6 +28,15 @@ class VlcEngine(context: Context) {
     var onBuffering: ((Boolean) -> Unit)? = null
     var onEnded: (() -> Unit)? = null
 
+    /** Proveedor dinámico de URL en vivo (permite refrescar/re-envolver URL al reconectar). */
+    var liveUrlProvider: (() -> String)? = null
+
+    var isVod: Boolean = false
+        private set
+
+    var isPausedByUser: Boolean = false
+        private set
+
     private var layout: VLCVideoLayout? = null
     private var pending: Runnable? = null
     private var openRunnable: Runnable? = null
@@ -37,29 +46,73 @@ class VlcEngine(context: Context) {
     private var lastOpenAt = 0L
     private var endedFiredForUrl: String? = null
 
+    @Volatile private var lastProgressUptime = 0L
+    @Volatile private var lastProgressTimeValue = -1L
+    @Volatile private var hasReceivedTime = false
+    @Volatile private var reconnectCooldownUntil = 0L
+
+    private val watchdogRunnable = object : Runnable {
+        override fun run() {
+            if (released) return
+            checkLiveStall()
+            main.postDelayed(this, WATCHDOG_INTERVAL_MS)
+        }
+    }
+
     init {
         player.setEventListener { ev ->
             when (ev.type) {
-                MediaPlayer.Event.Playing -> main.post {
-                    applyAspectMode()
-                    onBuffering?.invoke(false)
-                    onPlaying?.invoke()
+                MediaPlayer.Event.Playing -> {
+                    val now = SystemClock.uptimeMillis()
+                    lastProgressUptime = now
+                    hasReceivedTime = true
+                    main.post {
+                        applyAspectMode()
+                        onBuffering?.invoke(false)
+                        onPlaying?.invoke()
+                    }
                 }
                 MediaPlayer.Event.Vout -> main.post { applyAspectMode() }
+                MediaPlayer.Event.TimeChanged -> {
+                    val t = ev.timeChanged
+                    if (t != lastProgressTimeValue) {
+                        lastProgressTimeValue = t
+                        lastProgressUptime = SystemClock.uptimeMillis()
+                        hasReceivedTime = true
+                    }
+                }
                 MediaPlayer.Event.Buffering -> {
                     val pct = ev.buffering
+                    if (pct >= 95f) {
+                        lastProgressUptime = SystemClock.uptimeMillis()
+                    }
                     main.post { onBuffering?.invoke(pct < 92f) }
                 }
                 MediaPlayer.Event.EndReached -> main.post {
-                    val url = lastUrl
-                    if (url != null && endedFiredForUrl != url) {
-                        endedFiredForUrl = url
-                        onEnded?.invoke()
+                    if (!isVod) {
+                        // En TV en vivo, EndReached significa corte de conexión del stream.
+                        // Reconectar de inmediato y de forma silenciosa ("sin que se note").
+                        Log.i(TAG, "EndReached en canal en vivo -> reconectando inmediatamente...")
+                        reconnectLive("end_reached", force = true)
+                    } else {
+                        val url = lastUrl
+                        if (url != null && endedFiredForUrl != url) {
+                            endedFiredForUrl = url
+                            onEnded?.invoke()
+                        }
                     }
                 }
-                MediaPlayer.Event.EncounteredError -> main.post { onError?.invoke() }
+                MediaPlayer.Event.EncounteredError -> main.post {
+                    if (!isVod) {
+                        Log.w(TAG, "EncounteredError en canal en vivo -> reconectando inmediatamente...")
+                        reconnectLive("encountered_error", force = true)
+                    } else {
+                        onError?.invoke()
+                    }
+                }
             }
         }
+        main.postDelayed(watchdogRunnable, WATCHDOG_INTERVAL_MS)
     }
 
     fun attach(view: VLCVideoLayout) {
@@ -85,18 +138,37 @@ class VlcEngine(context: Context) {
     fun togglePause() {
         if (released) return
         try {
-            if (player.isPlaying) player.pause() else player.play()
+            if (player.isPlaying) {
+                isPausedByUser = true
+                player.pause()
+            } else {
+                isPausedByUser = false
+                lastProgressUptime = SystemClock.uptimeMillis()
+                player.play()
+            }
         } catch (_: Throwable) {}
     }
 
     fun pause() {
         if (released) return
+        isPausedByUser = true
         try { player.pause() } catch (_: Throwable) {}
     }
 
     fun resume() {
         if (released) return
+        isPausedByUser = false
+        val now = SystemClock.uptimeMillis()
+        lastProgressUptime = now
+        reconnectCooldownUntil = now + 1200L
         try { player.play() } catch (_: Throwable) {}
+        if (!isVod) {
+            main.postDelayed({
+                if (!released && !isVod && !isPausedByUser && !isPlayingSafe()) {
+                    reconnectLive("resume_not_playing", force = true)
+                }
+            }, 500L)
+        }
     }
 
     val isPlaying: Boolean
@@ -311,8 +383,15 @@ class VlcEngine(context: Context) {
 
     private fun schedule(url: String, debounceMs: Long, vod: Boolean) {
         if (released || url.isBlank()) return
-        if (url == lastUrl && isPlayingSafe()) return
+        if (url == lastUrl && isPlayingSafe() && !vod) return
         lastUrl = url
+        isVod = vod
+        isPausedByUser = false
+        val now = SystemClock.uptimeMillis()
+        lastProgressUptime = now
+        lastProgressTimeValue = -1L
+        hasReceivedTime = false
+        reconnectCooldownUntil = now + (if (vod) 4000L else 2000L)
         endedFiredForUrl = null
         val myGen = ++gen
         pending?.let { main.removeCallbacks(it) }
@@ -362,9 +441,9 @@ class VlcEngine(context: Context) {
                 addOption(":sout-mux-caching=$cache")
                 if (!vod) {
                     addOption(":live-caching=$cache")
-                    addOption(":clock-jitter=0")
-                    addOption(":clock-synchro=0")
+                    addOption(":clock-jitter=500")
                     addOption(":http-reconnect")
+                    addOption(":http-continuous")
                 } else {
                     addOption(":http-reconnect")
                 }
@@ -377,13 +456,96 @@ class VlcEngine(context: Context) {
             main.post { applyAspectMode() }
         } catch (e: Throwable) {
             Log.e(TAG, "play failed $url", e)
-            onError?.invoke()
+            if (!vod) {
+                reconnectLive("play_failed", force = true)
+            } else {
+                onError?.invoke()
+            }
         }
+    }
+
+    /**
+     * Revisa si el canal en vivo se quedó congelado, pegado o sin reproducir cuadros.
+     */
+    private fun checkLiveStall() {
+        if (released || isVod || isPausedByUser) return
+        val url = lastUrl ?: return
+        val now = SystemClock.uptimeMillis()
+
+        // Si estamos dentro del período de enfriamiento tras zapping o reconexión, esperar
+        if (now < reconnectCooldownUntil) return
+
+        // Consultar el player por si hubo avance sin evento TimeChanged
+        val curTime = try { player.time } catch (_: Throwable) { -1L }
+        if (curTime > 0L && curTime != lastProgressTimeValue) {
+            lastProgressTimeValue = curTime
+            lastProgressUptime = now
+            hasReceivedTime = true
+            return
+        }
+
+        // Si el estado del reproductor cayó en Stopped, Ended o Error de forma imprevista
+        val state = try { player.playerState } catch (_: Throwable) { -1 }
+        if (state == 5 /* Stopped */ || state == 6 /* Ended */ || state == 7 /* Error */) {
+            Log.w(TAG, "Player en estado anormal ($state) en canal live -> reconectando silenciosamente...")
+            reconnectLive("state_$state", force = true)
+            return
+        }
+
+        // Si aún no ha iniciado la reproducción tras abrir el stream
+        if (!hasReceivedTime) {
+            val waitTime = now - lastOpenAt
+            if (waitTime >= STARTUP_TIMEOUT_MS) {
+                Log.w(TAG, "Canal live no arrancó tras ${waitTime}ms -> reconectando silenciosamente...")
+                reconnectLive("startup_timeout", force = false)
+            }
+            return
+        }
+
+        // Si ya estaba reproduciendo pero lleva más de STALL_TIMEOUT_MS sin avanzar
+        val stalledDuration = now - lastProgressUptime
+        if (stalledDuration >= STALL_TIMEOUT_MS) {
+            Log.w(TAG, "Canal live congelado (${stalledDuration}ms sin cuadros) -> reconectando inmediatamente sin que se note...")
+            reconnectLive("freeze_${stalledDuration}ms", force = false)
+        }
+    }
+
+    /**
+     * Reconecta de forma transparente el stream en vivo:
+     * No llama a player.stop() para evitar pantallas negras ("sin que se note").
+     * La superficie mantiene el último fotograma congelado hasta que el nuevo stream
+     * decodifica y comienza a reproducir en el mismo surface de inmediato.
+     */
+    fun reconnectLive(reason: String = "", force: Boolean = false) {
+        if (released || isVod) return
+        val now = SystemClock.uptimeMillis()
+        if (!force && now < reconnectCooldownUntil) return
+        reconnectCooldownUntil = now + RECONNECT_COOLDOWN_MS
+
+        val nextUrl = liveUrlProvider?.invoke() ?: lastUrl ?: return
+        lastUrl = nextUrl
+        lastOpenAt = now
+        lastProgressUptime = now
+        lastProgressTimeValue = -1L
+        hasReceivedTime = false
+
+        val myGen = ++gen
+        pending?.let { main.removeCallbacks(it) }
+        openRunnable?.let { main.removeCallbacks(it) }
+
+        Log.i(TAG, "Reconectando canal en vivo ($reason): $nextUrl")
+        val open = Runnable {
+            if (released || myGen != gen) return@Runnable
+            openMedia(nextUrl, vod = false)
+        }
+        openRunnable = open
+        main.post(open)
     }
 
     fun release() {
         if (released) return
         released = true
+        main.removeCallbacks(watchdogRunnable)
         pending?.let { main.removeCallbacks(it) }
         openRunnable?.let { main.removeCallbacks(it) }
         try { player.setEventListener(null) } catch (_: Throwable) {}
@@ -399,9 +561,18 @@ class VlcEngine(context: Context) {
         private const val ZAP_DEBOUNCE_MS = 70L
         /** Soft-switch si el canal anterior ya abrió hace ≥ esto (evita SIGSEGV). */
         private const val SOFT_MIN_GAP_MS = 120L
-        /** Cache vivo bajo = primer frame más rápido (puede pixelear un instante). */
-        private const val LIVE_CACHE_MS = 25
+        /** Cache live optimizado: 350ms absorbe jitter de red sin demorar el zapping. */
+        private const val LIVE_CACHE_MS = 350
         private const val VOD_CACHE_MS = 1000
+
+        /** Intervalo de chequeo del watchdog de congelamiento (ms). */
+        private const val WATCHDOG_INTERVAL_MS = 600L
+        /** Tiempo sin avance de frames para declarar congelado (ms). */
+        private const val STALL_TIMEOUT_MS = 2500L
+        /** Tiempo de gracia en arranque inicial antes de reintentar (ms). */
+        private const val STARTUP_TIMEOUT_MS = 4000L
+        /** Cooldown para evitar tormenta de reconexiones seguidas (ms). */
+        private const val RECONNECT_COOLDOWN_MS = 2500L
 
         private fun createLib(ctx: Context): LibVLC {
             val tries = listOf(

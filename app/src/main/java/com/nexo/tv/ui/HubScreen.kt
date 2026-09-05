@@ -178,7 +178,9 @@ fun HubScreen(onLogout: () -> Unit) {
     fun playChannel(ch: LiveChannel, instant: Boolean) {
         persistWatching(ch)
         val remote = XtreamClient.liveUrl(ch.id)
-        val toPlay = StreamBridge.maybeWrap(remote)
+        val provider = { StreamBridge.maybeWrap(remote) }
+        engine.liveUrlProvider = provider
+        val toPlay = provider()
         revealBanner()
         if (instant) engine.playNow(toPlay) else engine.playZap(toPlay)
     }
