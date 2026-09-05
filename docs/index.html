@@ -1120,6 +1120,7 @@
       docData.demoExpiresAt = firebase.firestore.Timestamp.fromDate(expires);
     }
     await db.collection('access_codes').doc(code).set(docData);
+    syncCodeToRtdb(code, docData);
 
     // ---- Abre WhatsApp con el mensaje del servicio ya armado, listo para enviar ----
     if (sendWhatsapp && clientPhoneRaw) {
@@ -1155,6 +1156,50 @@
     setDemoHours(3);
     showToast('Codigo generado: ' + code);
   });
+
+  // =========================================================================
+  // Sincronización en tiempo real de Códigos con Firebase Realtime Database
+  // =========================================================================
+  const RTDB_CODES_URL = 'https://nexo-tv-d8766-default-rtdb.firebaseio.com/codes';
+
+  async function syncCodeToRtdb(code, data) {
+    if (!code || !data) return;
+    try {
+      const payload = Object.assign({}, data);
+      if (payload.createdAt && payload.createdAt.toDate) {
+        payload.createdAt = payload.createdAt.toDate().toISOString();
+      }
+      if (payload.demoExpiresAt && payload.demoExpiresAt.toDate) {
+        payload.demoExpiresAt = payload.demoExpiresAt.toDate().getTime();
+      }
+      await fetch(`${RTDB_CODES_URL}/${code}.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (e) {
+      console.warn('Error sincronizando código a RTDB:', e);
+    }
+  }
+
+  async function patchCodeToRtdb(code, patch) {
+    if (!code) return;
+    try {
+      await fetch(`${RTDB_CODES_URL}/${code}.json`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      });
+    } catch (_) {}
+  }
+
+  async function deleteCodeFromRtdb(code) {
+    if (!code) return;
+    try {
+      await fetch(`${RTDB_CODES_URL}/${code}.json`, { method: 'DELETE' });
+    } catch (_) {}
+  }
+
   // ---------- Listar codigos en tiempo real + estadisticas ----------
   let lastSnapshotDocs = [];
   function listenToCodes() {
@@ -1167,7 +1212,11 @@
     }
     query.onSnapshot(snapshot => {
         lastSnapshotDocs = [];
-        snapshot.forEach(doc => lastSnapshotDocs.push({ id: doc.id, data: doc.data() }));
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          lastSnapshotDocs.push({ id: doc.id, data: data });
+          syncCodeToRtdb(doc.id, data);
+        });
         if (currentUserRole !== 'admin') {
           // Como esta consulta filtrada no puede además pedir orden por fecha sin un índice
           // extra en Firestore, se ordena acá mismo del lado del panel.
@@ -1459,10 +1508,11 @@
   };
   window.toggleActive = async (code, currentlyActive) => {
     await db.collection('access_codes').doc(code).update({ active: !currentlyActive });
+    patchCodeToRtdb(code, { active: !currentlyActive });
   };
   window.resendWhatsapp = (code, clientName, clientPhone) => {
     const phoneDigits = String(clientPhone).replace(/[^0-9]/g, '');
-    const mensaje = 'Estimado/a *' + clientName + '*, le compartimos los datos de su servicio en *JetGo* 📌.\n\nSu código de acceso es: *' + code +
+    const mensaje = 'Estimado/a *' + clientName + '*, le compartimos los datos de su servicio en *NEXO TV* 📌.\n\nSu código de acceso es: *' + code +
       '*\n\n📥 Descargue la aplicación, ábrala e ingrese su código para continuar disfrutando del mejor entretenimiento. 🎬✨\n\n¡Muchas gracias por confiar en nosotros! 🙌';
     const waUrl = 'https://wa.me/' + phoneDigits + '?text=' + encodeURIComponent(mensaje);
     window.open(waUrl, '_blank');
@@ -1478,6 +1528,10 @@
     updates['deviceNames.' + deviceId] = firebase.firestore.FieldValue.delete();
     updates['deviceActivity.' + deviceId] = firebase.firestore.FieldValue.delete();
     await docRef.update(updates);
+    try {
+      fetch(`${RTDB_CODES_URL}/${code}/deviceActivity/${deviceId}.json`, { method: 'DELETE' });
+      fetch(`${RTDB_CODES_URL}/${code}/deviceNames/${deviceId}.json`, { method: 'DELETE' });
+    } catch (_) {}
     showToast('Dispositivo quitado');
   };
   // Convierte una cuenta demo en un plan pago: deja de ser demo y le pone la fecha de
@@ -1506,6 +1560,7 @@
         updates.demoExpiresAt = firebase.firestore.FieldValue.delete();
       }
       await docRef.update(updates);
+      patchCodeToRtdb(code, { isDemo: false, expirationDate: expirationDate, active: true });
       showToast('Plan de ' + labels[months] + ' aplicado');
     } catch (e) {
       console.error(e);
@@ -1515,6 +1570,7 @@
   window.deleteCode = async (code) => {
     if (!confirm('Eliminar el codigo ' + code + '? Esta accion no se puede deshacer.')) return;
     await db.collection('access_codes').doc(code).delete();
+    deleteCodeFromRtdb(code);
   };
   window.copyCode = (code) => {
     navigator.clipboard.writeText(code);
@@ -2369,6 +2425,7 @@
     };
 
     await db.collection('access_codes').doc(code).update(updates);
+    patchCodeToRtdb(code, updates);
     closeEditClientModal();
     showToast('Cliente actualizado correctamente');
   };

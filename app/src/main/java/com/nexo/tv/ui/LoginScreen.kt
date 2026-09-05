@@ -1,5 +1,6 @@
 package com.nexo.tv.ui
 
+import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -7,26 +8,26 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,177 +47,344 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nexo.tv.R
 import com.nexo.tv.Session
-import com.nexo.tv.data.XtreamClient
+import com.nexo.tv.data.CodeAuth
+import com.nexo.tv.data.CodeAuthResult
 import kotlinx.coroutines.launch
 
 private val Ember = Color(0xFFFF6A1A)
 private val EmberDeep = Color(0xFFDE5B17)
 private val Ink = Color(0xFF07060A)
 private val InkWarm = Color(0xFF1A0E08)
-private val Panel = Color(0x66120C0A)
+private val Panel = Color(0x88140E0C)
 
 @Composable
 fun LoginScreen(onSuccess: () -> Unit) {
-    var user by remember { mutableStateOf(Session.username) }
-    var pass by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var code by remember { mutableStateOf(Session.accessCode) }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var appeared by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val passFocus = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) { appeared = true }
-    val formAlpha by animateFloatAsState(
-        targetValue = if (appeared) 1f else 0f,
-        animationSpec = tween(700),
-        label = "formAlpha"
-    )
-    val formLift by animateFloatAsState(
-        targetValue = if (appeared) 0f else 28f,
-        animationSpec = tween(700),
-        label = "formLift"
-    )
+    val initialFocus = remember { FocusRequester() }
 
     fun submit() {
         if (busy) return
+        val clean = code.trim().filter { it.isDigit() }
+        if (clean.length != 6) {
+            error = "Ingresa los 6 dígitos del código"
+            return
+        }
         busy = true
         error = null
         scope.launch {
-            // Servidor oculto: usa el guardado / ElitePlus por defecto
-            val ok = XtreamClient.login(
-                user.trim(),
-                pass,
-                preferredServer = Session.server.ifBlank { Session.SERVER_ELITE }
-            )
+            val res = CodeAuth.validateAndLogin(clean, context)
             busy = false
-            if (ok) onSuccess() else error = "Usuario o clave incorrectos"
+            when (res) {
+                is CodeAuthResult.Success -> onSuccess()
+                is CodeAuthResult.Error -> error = res.message
+            }
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    fun appendDigit(d: String) {
+        if (code.length < 6) {
+            code += d
+            error = null
+            if (code.length == 6) {
+                submit()
+            }
+        }
+    }
+
+    fun deleteDigit() {
+        if (code.isNotEmpty()) {
+            code = code.dropLast(1)
+            error = null
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        appeared = true
+        try {
+            initialFocus.requestFocus()
+        } catch (_: Throwable) {}
+    }
+
+    val formAlpha by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0f,
+        animationSpec = tween(600),
+        label = "formAlpha"
+    )
+    val formLift by animateFloatAsState(
+        targetValue = if (appeared) 0f else 20f,
+        animationSpec = tween(600),
+        label = "formLift"
+    )
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN) {
+                    when (event.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_0, AndroidKeyEvent.KEYCODE_NUMPAD_0 -> { appendDigit("0"); true }
+                        AndroidKeyEvent.KEYCODE_1, AndroidKeyEvent.KEYCODE_NUMPAD_1 -> { appendDigit("1"); true }
+                        AndroidKeyEvent.KEYCODE_2, AndroidKeyEvent.KEYCODE_NUMPAD_2 -> { appendDigit("2"); true }
+                        AndroidKeyEvent.KEYCODE_3, AndroidKeyEvent.KEYCODE_NUMPAD_3 -> { appendDigit("3"); true }
+                        AndroidKeyEvent.KEYCODE_4, AndroidKeyEvent.KEYCODE_NUMPAD_4 -> { appendDigit("4"); true }
+                        AndroidKeyEvent.KEYCODE_5, AndroidKeyEvent.KEYCODE_NUMPAD_5 -> { appendDigit("5"); true }
+                        AndroidKeyEvent.KEYCODE_6, AndroidKeyEvent.KEYCODE_NUMPAD_6 -> { appendDigit("6"); true }
+                        AndroidKeyEvent.KEYCODE_7, AndroidKeyEvent.KEYCODE_NUMPAD_7 -> { appendDigit("7"); true }
+                        AndroidKeyEvent.KEYCODE_8, AndroidKeyEvent.KEYCODE_NUMPAD_8 -> { appendDigit("8"); true }
+                        AndroidKeyEvent.KEYCODE_9, AndroidKeyEvent.KEYCODE_NUMPAD_9 -> { appendDigit("9"); true }
+                        AndroidKeyEvent.KEYCODE_DEL -> { deleteDigit(); true }
+                        AndroidKeyEvent.KEYCODE_ENTER, AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                            if (code.length == 6) { submit(); true } else false
+                        }
+                        else -> false
+                    }
+                } else false
+            }
+    ) {
         LoginBackdrop()
 
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = 48.dp, vertical = 36.dp)
+                .padding(horizontal = 40.dp, vertical = 20.dp)
                 .alpha(formAlpha)
                 .padding(top = formLift.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Image(
-                painter = painterResource(R.drawable.ic_nexo_logo),
-                contentDescription = "NEXO",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(RoundedCornerShape(28.dp))
-            )
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = "NEXO",
-                color = Ember,
-                fontSize = 42.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.SansSerif,
-                letterSpacing = 8.sp,
-                textAlign = TextAlign.Center
-            )
+            // Header NEXO
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_nexo_logo),
+                    contentDescription = "NEXO",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = "NEXO",
+                    color = Ember,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.SansSerif,
+                    letterSpacing = 6.sp
+                )
+            }
             Text(
                 text = "Tu TV, al instante",
-                color = Color.White.copy(alpha = 0.78f),
-                fontSize = 18.sp,
+                color = Color.White.copy(alpha = 0.72f),
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                letterSpacing = 1.2.sp
+                letterSpacing = 1.sp
             )
-            Spacer(Modifier.height(36.dp))
 
+            Spacer(Modifier.height(18.dp))
+
+            // Tarjeta de Código
             Column(
                 Modifier
-                    .widthIn(max = 440.dp)
+                    .widthIn(max = 420.dp)
                     .fillMaxWidth()
-                    .background(Panel, RoundedCornerShape(22.dp))
-                    .padding(horizontal = 28.dp, vertical = 26.dp),
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(Panel)
+                    .border(1.dp, Color(0x33FF6A1A), RoundedCornerShape(22.dp))
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "Iniciar sesión",
+                    "Conectar por código",
                     color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(Modifier.height(20.dp))
-                OutlinedTextField(
-                    value = user,
-                    onValueChange = { user = it },
-                    label = { Text("Usuario") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    keyboardActions = KeyboardActions(onNext = { passFocus.requestFocus() }),
-                    colors = fieldColors(),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .tvFocus(shape = RoundedCornerShape(14.dp), focusedScale = 1.01f)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Ingresa tu código de 6 dígitos",
+                    color = Color.White.copy(alpha = 0.65f),
+                    fontSize = 13.sp
                 )
-                Spacer(Modifier.height(14.dp))
-                OutlinedTextField(
-                    value = pass,
-                    onValueChange = { pass = it },
-                    label = { Text("Contraseña") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(onDone = { submit() }),
-                    colors = fieldColors(),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(passFocus)
-                        .tvFocus(shape = RoundedCornerShape(14.dp), focusedScale = 1.01f)
-                )
-                if (error != null) {
-                    Spacer(Modifier.height(10.dp))
-                    Text(error!!, color = Color(0xFFFF8A80), fontSize = 14.sp)
-                }
-                Spacer(Modifier.height(22.dp))
-                Button(
-                    onClick = { submit() },
-                    enabled = !busy,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = EmberDeep,
-                        disabledContainerColor = EmberDeep.copy(alpha = 0.45f)
-                    ),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .tvFocus(shape = RoundedCornerShape(14.dp), focusedScale = 1.03f)
+
+                Spacer(Modifier.height(16.dp))
+
+                // Casillas de los 6 dígitos
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    for (i in 0 until 6) {
+                        val digit = code.getOrNull(i)?.toString().orEmpty()
+                        val isCurrent = (code.length == i)
+                        Box(
+                            modifier = Modifier
+                                .size(width = 44.dp, height = 52.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (digit.isNotEmpty()) Color(0x33FF6A1A) else Color(0x22111111))
+                                .border(
+                                    width = if (isCurrent) 2.5.dp else if (digit.isNotEmpty()) 2.dp else 1.dp,
+                                    color = if (isCurrent) Ember else if (digit.isNotEmpty()) Ember.copy(alpha = 0.85f) else Color(0x33FFFFFF),
+                                    shape = RoundedCornerShape(10.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (digit.isNotEmpty()) {
+                                Text(
+                                    text = digit,
+                                    color = Color.White,
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            } else if (isCurrent) {
+                                Box(
+                                    Modifier
+                                        .width(14.dp)
+                                        .height(2.5.dp)
+                                        .background(Ember, RoundedCornerShape(1.dp))
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Mensajes de error o carga
+                if (busy) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = Ember,
+                            strokeWidth = 2.5.dp,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Verificando código…",
+                            color = Ember,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                } else if (error != null) {
+                    Spacer(Modifier.height(10.dp))
                     Text(
-                        if (busy) "Entrando…" else "Entrar",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp
+                        error!!,
+                        color = Color(0xFFFF8A80),
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Medium
                     )
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // Teclado numérico en pantalla para control remoto
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Fila 1: 1, 2, 3
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        NumPadKey("1", Modifier.weight(1f), focusRequester = initialFocus) { appendDigit("1") }
+                        NumPadKey("2", Modifier.weight(1f)) { appendDigit("2") }
+                        NumPadKey("3", Modifier.weight(1f)) { appendDigit("3") }
+                    }
+                    // Fila 2: 4, 5, 6
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        NumPadKey("4", Modifier.weight(1f)) { appendDigit("4") }
+                        NumPadKey("5", Modifier.weight(1f)) { appendDigit("5") }
+                        NumPadKey("6", Modifier.weight(1f)) { appendDigit("6") }
+                    }
+                    // Fila 3: 7, 8, 9
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        NumPadKey("7", Modifier.weight(1f)) { appendDigit("7") }
+                        NumPadKey("8", Modifier.weight(1f)) { appendDigit("8") }
+                        NumPadKey("9", Modifier.weight(1f)) { appendDigit("9") }
+                    }
+                    // Fila 4: Borrar, 0, Conectar
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        NumPadKey(
+                            label = "⌫",
+                            modifier = Modifier.weight(1f),
+                            bg = Color(0x28FFFFFF),
+                            fontSize = 18.sp
+                        ) { deleteDigit() }
+
+                        NumPadKey("0", Modifier.weight(1f)) { appendDigit("0") }
+
+                        NumPadKey(
+                            label = "Conectar",
+                            modifier = Modifier.weight(1.3f),
+                            bg = if (code.length == 6) EmberDeep else Color(0x33FF6A1A),
+                            fontSize = 13.sp
+                        ) { submit() }
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun NumPadKey(
+    label: String,
+    modifier: Modifier = Modifier,
+    bg: Color = Color(0x33222228),
+    fontSize: androidx.compose.ui.unit.TextUnit = 18.sp,
+    focusRequester: FocusRequester? = null,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .height(44.dp)
+            .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.05f)
+            .clip(RoundedCornerShape(10.dp))
+            .background(bg)
+            .clickable { onClick() }
+            .focusable(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = Color.White,
+            fontSize = fontSize,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -297,53 +465,35 @@ internal fun LoginBackdrop() {
             val x = w * sweep
             moveTo(x - w * 0.08f, 0f)
             lineTo(x + w * 0.02f, 0f)
-            lineTo(x - w * 0.18f, h)
-            lineTo(x - w * 0.28f, h)
+            lineTo(x + w * 0.18f, h)
+            lineTo(x + w * 0.08f, h)
             close()
         }
         drawPath(
             path = beam,
-            brush = Brush.horizontalGradient(
+            brush = Brush.linearGradient(
                 colors = listOf(
                     Color.Transparent,
-                    Color.White.copy(alpha = 0.06f),
-                    Ember.copy(alpha = 0.10f),
+                    Ember.copy(alpha = 0.07f * glow),
                     Color.Transparent
-                )
+                ),
+                start = Offset(0f, 0f),
+                end = Offset(w, h)
             )
         )
 
-        // Anillos sutiles detrás del brand
-        val ringCenter = Offset(w * 0.5f, h * 0.28f)
-        for (i in 1..3) {
-            drawCircle(
-                color = Ember.copy(alpha = 0.07f * glow / i),
-                radius = w * (0.12f + i * 0.07f),
-                center = ringCenter,
-                style = Stroke(width = 2.dp.toPx())
-            )
-        }
-
-        // Viñeta
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
-                center = Offset(w * 0.5f, h * 0.45f),
-                radius = w * 0.85f
-            )
+        // Círculos ornamentales tenues
+        drawCircle(
+            color = Ember.copy(alpha = 0.06f * glow),
+            radius = w * 0.38f,
+            center = Offset(w * 0.85f, h * 0.15f),
+            style = Stroke(width = 1.5.dp.toPx())
+        )
+        drawCircle(
+            color = Ember.copy(alpha = 0.035f * glow),
+            radius = w * 0.46f,
+            center = Offset(w * 0.85f, h * 0.15f),
+            style = Stroke(width = 1.dp.toPx())
         )
     }
 }
-
-@Composable
-private fun fieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = Color.White,
-    unfocusedTextColor = Color.White,
-    focusedBorderColor = Ember,
-    unfocusedBorderColor = Color.White.copy(alpha = 0.28f),
-    focusedLabelColor = Ember,
-    unfocusedLabelColor = Color.White.copy(alpha = 0.55f),
-    cursorColor = Ember,
-    focusedContainerColor = Color.Black.copy(alpha = 0.18f),
-    unfocusedContainerColor = Color.Black.copy(alpha = 0.10f)
-)

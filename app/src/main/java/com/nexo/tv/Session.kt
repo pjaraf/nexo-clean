@@ -33,6 +33,30 @@ object Session {
         }
     }
 
+    var accessCode: String
+        get() = prefs.getString("access_code", "") ?: ""
+        set(value) { prefs.edit().putString("access_code", value).apply() }
+
+    var clientName: String
+        get() = prefs.getString("client_name", "") ?: ""
+        set(value) { prefs.edit().putString("client_name", value).apply() }
+
+    var expirationDate: String
+        get() = prefs.getString("expiration_date", "") ?: ""
+        set(value) { prefs.edit().putString("expiration_date", value).apply() }
+
+    var allowTv: Boolean
+        get() = prefs.getBoolean("allow_tv", true)
+        set(value) { prefs.edit().putBoolean("allow_tv", value).apply() }
+
+    var allowMovies: Boolean
+        get() = prefs.getBoolean("allow_movies", true)
+        set(value) { prefs.edit().putBoolean("allow_movies", value).apply() }
+
+    var allowSeries: Boolean
+        get() = prefs.getBoolean("allow_series", true)
+        set(value) { prefs.edit().putBoolean("allow_series", value).apply() }
+
     var username: String
         get() = prefs.getString("user", "") ?: ""
         set(value) { prefs.edit().putString("user", value).apply() }
@@ -61,6 +85,30 @@ object Session {
     fun login(user: String, pass: String) {
         username = user
         password = pass
+    }
+
+    fun loginWithCode(
+        code: String,
+        user: String,
+        pass: String,
+        targetServer: String,
+        client: String = "",
+        expiration: String = "",
+        tv: Boolean = true,
+        movies: Boolean = true,
+        series: Boolean = true
+    ) {
+        accessCode = code
+        username = user
+        password = pass
+        if (targetServer.isNotBlank()) {
+            server = targetServer
+        }
+        clientName = client
+        expirationDate = expiration
+        allowTv = tv
+        allowMovies = movies
+        allowSeries = series
     }
 
     fun logout() {
