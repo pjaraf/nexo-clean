@@ -101,6 +101,9 @@ import com.nexo.tv.player.VlcEngine
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.videolan.libvlc.util.VLCVideoLayout
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.roundToInt
 
 private val Orange = Color(0xFFDE5B17)
@@ -716,17 +719,63 @@ private fun HomePane(
     onPositionSlot: (x: Int, y: Int, w: Int, h: Int) -> Unit,
     onMovie: (VodItem) -> Unit
 ) {
+    val ctx = LocalContext.current
     var featured by remember(movies) { mutableStateOf(movies.firstOrNull()) }
-    val playerHeight = 188.dp
-    val playerWidth = 334.dp // 16:9 con altura de 188.dp (188 * 16 / 9)
+    val playerHeight = 265.dp
+    val playerWidth = 471.dp // 16:9 con altura de 265.dp (265 * 16 / 9)
+
+    val esLocale = remember { Locale("es", "ES") }
+    val is24 = remember(ctx) { android.text.format.DateFormat.is24HourFormat(ctx) }
+    val timePattern = if (is24) "HH:mm" else "h:mm a"
+    val timeFmt = remember(timePattern, esLocale) { SimpleDateFormat(timePattern, esLocale) }
+    val dateFmt = remember(esLocale) { SimpleDateFormat("EEEE, d 'de' MMMM", esLocale) }
+
+    fun formatDate(d: Date): String {
+        val raw = dateFmt.format(d)
+        return raw.replaceFirstChar { if (it.isLowerCase()) it.titlecase(esLocale) else it.toString() }
+    }
+
+    var currentTime by remember { mutableStateOf(timeFmt.format(Date())) }
+    var currentDate by remember { mutableStateOf(formatDate(Date())) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            val now = Date()
+            currentTime = timeFmt.format(now)
+            currentDate = formatDate(now)
+            delay(1000)
+        }
+    }
 
     Column(
         Modifier
             .fillMaxSize()
-            .padding(start = 88.dp, end = 20.dp, top = 22.dp, bottom = 12.dp)
+            .padding(start = 88.dp, end = 20.dp, top = 16.dp, bottom = 8.dp)
     ) {
-        Text("NEXO", color = Orange, fontSize = 30.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.height(14.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("NEXO", color = Orange, fontSize = 28.sp, fontWeight = FontWeight.Black)
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = currentTime,
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = currentDate,
+                    color = Color.White.copy(alpha = 0.75f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
 
         // Fila Hero: Mini reproductor de TV en vivo + información y botón + Carátula al lado derecho
         Row(
@@ -751,7 +800,7 @@ private fun HomePane(
                     }
             )
 
-            Spacer(Modifier.width(18.dp))
+            Spacer(Modifier.width(14.dp))
 
             // Información del canal y botón TV en vivo (centro)
             Column(
@@ -775,7 +824,7 @@ private fun HomePane(
                 Text(
                     text = currentChannel?.name ?: "Cargando TV en vivo…",
                     color = Color.White,
-                    fontSize = 24.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -806,7 +855,7 @@ private fun HomePane(
                         )
                         .clickable { onExpandLive() }
                         .focusable()
-                        .padding(horizontal = 22.dp, vertical = 11.dp),
+                        .padding(horizontal = 20.dp, vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -825,10 +874,9 @@ private fun HomePane(
                 }
             }
 
-            Spacer(Modifier.width(18.dp))
+            Spacer(Modifier.width(14.dp))
 
-            // Carátula al lado derecho como antes con el mismo alto que el reproductor
-            // y el ancho para que se vea la carátula completa
+            // Carátula al lado derecho con el mismo alto que el reproductor
             featured?.let { movie ->
                 Box(
                     Modifier
@@ -862,7 +910,7 @@ private fun HomePane(
             )
         } else {
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(movies, key = { it.id }) { m ->
