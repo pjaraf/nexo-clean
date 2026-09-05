@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Panel Administrativo — NEXO TV</title>
+  <title>Panel Administrativo en Vivo — NEXO TV</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -38,7 +38,6 @@
       flex-direction: column;
     }
 
-    /* Top Bar */
     header {
       background: rgba(21, 23, 34, 0.85);
       backdrop-filter: blur(12px);
@@ -115,16 +114,6 @@
       transform: translateY(-1px);
     }
 
-    .btn-secondary {
-      background: #232738;
-      color: var(--text-main);
-      border: 1px solid #32374e;
-    }
-
-    .btn-secondary:hover {
-      background: #2d3247;
-    }
-
     .btn-outline {
       background: transparent;
       border: 1px solid var(--card-border);
@@ -136,7 +125,6 @@
       border-color: #3b415a;
     }
 
-    /* Container */
     main {
       flex: 1;
       max-width: 1180px;
@@ -148,12 +136,12 @@
       gap: 24px;
     }
 
-    /* GitHub Auth banner */
-    .auth-banner {
-      background: linear-gradient(135deg, rgba(255, 107, 0, 0.08), rgba(21, 23, 34, 0.95));
-      border: 1px solid rgba(255, 107, 0, 0.25);
+    /* Live Sync Banner */
+    .sync-banner {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(21, 23, 34, 0.95));
+      border: 1px solid rgba(16, 185, 129, 0.3);
       border-radius: var(--radius);
-      padding: 20px 24px;
+      padding: 18px 24px;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -161,26 +149,27 @@
       gap: 16px;
     }
 
-    .auth-status {
+    .sync-status {
       display: flex;
       align-items: center;
       gap: 12px;
     }
 
-    .status-dot {
-      width: 10px;
-      height: 10px;
+    .pulse-dot {
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
-      background: var(--danger);
-      box-shadow: 0 0 10px var(--danger);
-    }
-
-    .status-dot.connected {
       background: var(--success);
-      box-shadow: 0 0 10px var(--success);
+      box-shadow: 0 0 14px var(--success);
+      animation: pulse 2s infinite;
     }
 
-    /* Grid Sections */
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
     .grid-2 {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
@@ -218,7 +207,6 @@
       color: var(--accent);
     }
 
-    /* Form Fields */
     .field {
       display: flex;
       flex-direction: column;
@@ -273,7 +261,6 @@
       color: var(--text-muted);
     }
 
-    /* Switch */
     .switch {
       position: relative;
       display: inline-block;
@@ -316,7 +303,6 @@
       transform: translateX(22px);
     }
 
-    /* Server list */
     .fallback-list {
       display: flex;
       flex-direction: column;
@@ -345,13 +331,12 @@
       color: white;
     }
 
-    /* Toast Notification */
     #toast {
       position: fixed;
       bottom: 24px;
       right: 24px;
-      background: #1c202e;
-      border: 1px solid var(--accent);
+      background: #151722;
+      border: 1px solid var(--success);
       color: white;
       padding: 14px 22px;
       border-radius: 12px;
@@ -363,30 +348,6 @@
       gap: 10px;
       z-index: 100;
     }
-
-    /* Modal */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.75);
-      backdrop-filter: blur(8px);
-      display: none;
-      place-items: center;
-      z-index: 99;
-      padding: 20px;
-    }
-
-    .modal-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius);
-      padding: 28px;
-      max-width: 480px;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
   </style>
 </head>
 <body>
@@ -396,35 +357,32 @@
       <div class="brand-badge">N</div>
       <div>
         <div class="brand-title">NEXO TV</div>
-        <div class="brand-sub">Panel de Administración Web</div>
+        <div class="brand-sub">Panel en Vivo — Firebase Realtime</div>
       </div>
     </div>
     <div class="header-actions">
-      <button class="btn btn-outline" onclick="loadRemoteConfig()">
+      <button class="btn btn-outline" onclick="loadFromFirebase()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
         Recargar
       </button>
-      <button class="btn btn-primary" onclick="saveConfig()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Guardar en GitHub
+      <button class="btn btn-primary" onclick="saveToFirebase()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
+        Aplicar Cambios en Vivo
       </button>
     </div>
   </header>
 
   <main>
-    <!-- GitHub Token Banner -->
-    <div class="auth-banner">
-      <div class="auth-status">
-        <div class="status-dot" id="authDot"></div>
+    <!-- Live Firebase Banner -->
+    <div class="sync-banner">
+      <div class="sync-status">
+        <div class="pulse-dot" id="liveDot"></div>
         <div>
-          <div style="font-weight: 700; font-size: 14px;" id="authStatusText">Conexión con GitHub no configurada</div>
-          <div style="font-size: 12px; color: var(--text-muted);" id="authRepoText">Repositorio: pjaraf/nexo-clean (archivo nexo-config.json)</div>
+          <div style="font-weight: 700; font-size: 14px;" id="liveStatusText">Conectado en tiempo real a Firebase</div>
+          <div style="font-size: 12px; color: var(--text-muted);">Los cambios se transmiten instantáneamente a todos los televisores conectados.</div>
         </div>
       </div>
-      <button class="btn btn-secondary" onclick="openAuthModal()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Configurar Token de GitHub
-      </button>
+      <div style="font-size: 12px; color: #a1a1aa; font-family: monospace;" id="lastUpdateLabel">Actualizado: --</div>
     </div>
 
     <!-- Main Grid -->
@@ -501,8 +459,8 @@
 
         <div class="toggle-row">
           <div class="toggle-info">
-            <h4>Mostrar Aviso Global</h4>
-            <p>Aparece como notificación para todos los usuarios</p>
+            <h4>Mostrar Aviso Global en Pantalla</h4>
+            <p>Aparece como notificación para todos los usuarios en sus televisores</p>
           </div>
           <label class="switch">
             <input type="checkbox" id="announcementEnabled">
@@ -533,7 +491,7 @@
         <div class="toggle-row">
           <div class="toggle-info">
             <h4>Activar Bloqueo por Mantenimiento</h4>
-            <p>Pausa temporalmente el acceso con aviso explicativo</p>
+            <p>Pausa temporalmente el acceso con aviso explicativo en pantalla</p>
           </div>
           <label class="switch">
             <input type="checkbox" id="maintenanceEnabled">
@@ -555,34 +513,10 @@
     </div>
   </main>
 
-  <!-- Modal Auth -->
-  <div class="modal-overlay" id="authModal">
-    <div class="modal-card">
-      <div style="font-size: 18px; font-weight: 700;">Conectar con GitHub</div>
-      <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
-        Para guardar los cambios directamente en el repositorio desde la web, ingresa un <strong>GitHub Personal Access Token (PAT)</strong> con permiso de escritura (<code>repo</code> o <code>contents:write</code>).
-      </p>
-      <div class="field">
-        <label for="githubToken">GitHub Token (ghp_... o github_pat_...)</label>
-        <input type="password" id="githubToken" class="input-text" placeholder="Pega tu token aquí..." />
-      </div>
-      <div class="field">
-        <label for="githubRepo">Repositorio (Usuario/Repo)</label>
-        <input type="text" id="githubRepo" class="input-text" value="pjaraf/nexo-clean" />
-      </div>
-      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
-        <button class="btn btn-outline" onclick="closeAuthModal()">Cancelar</button>
-        <button class="btn btn-primary" onclick="saveAuthToken()">Guardar Credencial</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="toast">Configuración actualizada</div>
+  <div id="toast">⚡ ¡Configuración actualizada en vivo en Firebase!</div>
 
   <script>
-    const CONFIG_PATH = 'nexo-config.json';
-    let fileSha = null;
-
+    const FIREBASE_URL = 'https://nexo-tv-d8766-default-rtdb.firebaseio.com/config.json';
     let configData = {
       updatedAt: new Date().toISOString(),
       servers: {
@@ -616,59 +550,10 @@
       setTimeout(() => { toast.style.display = 'none'; }, 3500);
     }
 
-    function getStoredToken() {
-      return localStorage.getItem('nexo_gh_token') || '';
-    }
-
-    function getStoredRepo() {
-      return localStorage.getItem('nexo_gh_repo') || 'pjaraf/nexo-clean';
-    }
-
-    function updateAuthStatusUI() {
-      const token = getStoredToken();
-      const dot = document.getElementById('authDot');
-      const title = document.getElementById('authStatusText');
-      const repo = document.getElementById('authRepoText');
-
-      repo.innerText = `Repositorio: ${getStoredRepo()} (${CONFIG_PATH})`;
-      if (token) {
-        dot.classList.add('connected');
-        title.innerText = 'Conectado a GitHub (Listo para guardar cambios)';
-      } else {
-        dot.classList.remove('connected');
-        title.innerText = 'Modo Lectura (Configura un Token para guardar)';
-      }
-    }
-
-    function openAuthModal() {
-      document.getElementById('githubToken').value = getStoredToken();
-      document.getElementById('githubRepo').value = getStoredRepo();
-      document.getElementById('authModal').style.display = 'grid';
-    }
-
-    function closeAuthModal() {
-      document.getElementById('authModal').style.display = 'none';
-    }
-
-    function saveAuthToken() {
-      const token = document.getElementById('githubToken').value.trim();
-      const repo = document.getElementById('githubRepo').value.trim() || 'pjaraf/nexo-clean';
-      if (token) {
-        localStorage.setItem('nexo_gh_token', token);
-      } else {
-        localStorage.removeItem('nexo_gh_token');
-      }
-      localStorage.setItem('nexo_gh_repo', repo);
-      closeAuthModal();
-      updateAuthStatusUI();
-      showToast('Credenciales guardadas.');
-      loadRemoteConfig();
-    }
-
     function renderFallbacks() {
       const container = document.getElementById('fallbackList');
       container.innerHTML = '';
-      configData.servers.fallbacks.forEach((url, index) => {
+      (configData.servers.fallbacks || []).forEach((url, index) => {
         const item = document.createElement('div');
         item.className = 'fallback-item';
         item.innerHTML = `
@@ -682,6 +567,7 @@
     }
 
     function addFallback() {
+      if (!configData.servers.fallbacks) configData.servers.fallbacks = [];
       configData.servers.fallbacks.push('');
       renderFallbacks();
     }
@@ -692,85 +578,50 @@
     }
 
     function populateUI(data) {
-      configData = data;
-      document.getElementById('primaryServer').value = data.servers?.primary || '';
-      document.getElementById('backupServer').value = data.servers?.backup || '';
+      if (!data) return;
+      configData = Object.assign({}, configData, data);
+      document.getElementById('primaryServer').value = configData.servers?.primary || '';
+      document.getElementById('backupServer').value = configData.servers?.backup || '';
       renderFallbacks();
 
-      document.getElementById('liveBuffer').value = data.settings?.liveBufferMs || 350;
-      document.getElementById('autoReconnect').checked = data.settings?.autoReconnect !== false;
-      document.getElementById('featuredChannelId').value = data.settings?.featuredChannelId || '';
+      document.getElementById('liveBuffer').value = configData.settings?.liveBufferMs || 350;
+      document.getElementById('autoReconnect').checked = configData.settings?.autoReconnect !== false;
+      document.getElementById('featuredChannelId').value = configData.settings?.featuredChannelId || '';
 
-      document.getElementById('announcementEnabled').checked = !!data.announcement?.enabled;
-      document.getElementById('announcementTitle').value = data.announcement?.title || '';
-      document.getElementById('announcementMsg').value = data.announcement?.message || '';
+      document.getElementById('announcementEnabled').checked = !!configData.announcement?.enabled;
+      document.getElementById('announcementTitle').value = configData.announcement?.title || '';
+      document.getElementById('announcementMsg').value = configData.announcement?.message || '';
 
-      document.getElementById('maintenanceEnabled').checked = !!data.maintenance?.enabled;
-      document.getElementById('maintenanceTitle').value = data.maintenance?.title || '';
-      document.getElementById('maintenanceMsg').value = data.maintenance?.message || '';
+      document.getElementById('maintenanceEnabled').checked = !!configData.maintenance?.enabled;
+      document.getElementById('maintenanceTitle').value = configData.maintenance?.title || '';
+      document.getElementById('maintenanceMsg').value = configData.maintenance?.message || '';
+
+      if (configData.updatedAt) {
+        document.getElementById('lastUpdateLabel').innerText = 'Actualizado: ' + new Date(configData.updatedAt).toLocaleTimeString();
+      }
     }
 
-    async function loadRemoteConfig() {
-      const repo = getStoredRepo();
-      const token = getStoredToken();
-      
-      // Intentar primero vía API de GitHub si hay token para tener el SHA del commit
-      if (token) {
-        try {
-          const res = await fetch(`https://api.github.com/repos/${repo}/contents/${CONFIG_PATH}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Accept': 'application/vnd.github.v3+json'
-            }
-          });
-          if (res.ok) {
-            const fileData = await res.json();
-            fileSha = fileData.sha;
-            const content = decodeURIComponent(escape(atob(fileData.content.replace(/\s/g, ''))));
-            populateUI(JSON.parse(content));
-            showToast('Configuración cargada desde GitHub.');
-            return;
-          }
-        } catch (e) {
-          console.warn('Fallo API GitHub:', e);
-        }
-      }
-
-      // Fallback a raw github / archivo local
+    async function loadFromFirebase() {
       try {
-        const res = await fetch(`https://raw.githubusercontent.com/${repo}/main/${CONFIG_PATH}?t=${Date.now()}`);
+        const res = await fetch(FIREBASE_URL + '?t=' + Date.now());
         if (res.ok) {
           const data = await res.json();
-          populateUI(data);
-          showToast('Configuración cargada (modo lectura).');
-          return;
+          if (data) {
+            populateUI(data);
+            showToast('⚡ Datos sincronizados desde Firebase.');
+          }
         }
       } catch (e) {
-        console.warn('Fallo raw github:', e);
+        console.error('Error cargando Firebase:', e);
       }
-
-      // Fallback relativo si se aloja en el mismo dominio
-      try {
-        const res = await fetch(`../${CONFIG_PATH}?t=${Date.now()}`);
-        if (res.ok) {
-          const data = await res.json();
-          populateUI(data);
-        }
-      } catch (_) {}
     }
 
-    async function saveConfig() {
-      const token = getStoredToken();
-      if (!token) {
-        openAuthModal();
-        return;
-      }
-
-      // Recopilar datos desde la UI
+    async function saveToFirebase() {
+      // Recopilar datos
       configData.updatedAt = new Date().toISOString();
       configData.servers.primary = document.getElementById('primaryServer').value.trim();
       configData.servers.backup = document.getElementById('backupServer').value.trim();
-      configData.servers.fallbacks = configData.servers.fallbacks.map(f => f.trim()).filter(f => f.length > 0);
+      configData.servers.fallbacks = (configData.servers.fallbacks || []).map(f => f.trim()).filter(f => f.length > 0);
 
       configData.settings.liveBufferMs = parseInt(document.getElementById('liveBuffer').value, 10) || 350;
       configData.settings.autoReconnect = document.getElementById('autoReconnect').checked;
@@ -785,60 +636,51 @@
       configData.maintenance.title = document.getElementById('maintenanceTitle').value.trim();
       configData.maintenance.message = document.getElementById('maintenanceMsg').value.trim();
 
-      const repo = getStoredRepo();
-      const jsonString = JSON.stringify(configData, null, 2);
-      const encodedContent = btoa(unescape(encodeURIComponent(jsonString)));
-
-      // Asegurar que tenemos el último sha
-      if (!fileSha) {
-        try {
-          const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${CONFIG_PATH}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Accept': 'application/vnd.github.v3+json'
-            }
-          });
-          if (checkRes.ok) {
-            const checkData = await checkRes.json();
-            fileSha = checkData.sha;
-          }
-        } catch (_) {}
-      }
-
       try {
-        const payload = {
-          message: 'Actualizar configuración remota desde Panel Web',
-          content: encodedContent,
-          branch: 'main'
-        };
-        if (fileSha) payload.sha = fileSha;
-
-        const res = await fetch(`https://api.github.com/repos/${repo}/contents/${CONFIG_PATH}`, {
+        const res = await fetch(FIREBASE_URL, {
           method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/vnd.github.v3+json'
-          },
-          body: JSON.stringify(payload)
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(configData)
         });
 
         if (res.ok) {
-          const savedData = await res.json();
-          fileSha = savedData.content?.sha || null;
-          showToast('✅ ¡Guardado con éxito en GitHub! La app TV se actualizará sola.');
+          showToast('⚡ ¡Cambios aplicados de inmediato en todos los televisores!');
+          document.getElementById('lastUpdateLabel').innerText = 'Actualizado: ' + new Date(configData.updatedAt).toLocaleTimeString();
         } else {
-          const err = await res.json();
-          alert('Error al guardar en GitHub: ' + (err.message || 'Verifica los permisos del Token'));
+          alert('Error al guardar en Firebase: ' + res.statusText);
         }
       } catch (e) {
-        alert('Error de conexión con GitHub: ' + e.message);
+        alert('Error de conexión: ' + e.message);
       }
     }
 
-    // Inicio
-    updateAuthStatusUI();
-    loadRemoteConfig();
+    // Iniciar escucha en tiempo real mediante SSE
+    function startRealtimeSync() {
+      try {
+        const es = new EventSource(FIREBASE_URL);
+        es.addEventListener('put', e => {
+          try {
+            const parsed = JSON.parse(e.data);
+            if (parsed.path === '/' && parsed.data) {
+              populateUI(parsed.data);
+            }
+          } catch (_) {}
+        });
+        es.onopen = () => {
+          document.getElementById('liveDot').style.background = 'var(--success)';
+          document.getElementById('liveStatusText').innerText = 'Conectado en tiempo real a Firebase';
+        };
+        es.onerror = () => {
+          document.getElementById('liveDot').style.background = 'var(--warning)';
+          document.getElementById('liveStatusText').innerText = 'Reconectando con Firebase...';
+        };
+      } catch (err) {
+        console.warn('SSE no disponible:', err);
+      }
+    }
+
+    loadFromFirebase();
+    startRealtimeSync();
   </script>
 </body>
 </html>
