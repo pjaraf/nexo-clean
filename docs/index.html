@@ -1,686 +1,2623 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Panel Administrativo en Vivo — NEXO TV</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0c0d12;
-      --card-bg: #151722;
-      --card-border: #232738;
-      --accent: #ff6b00;
-      --accent-hover: #ff8533;
-      --accent-glow: rgba(255, 107, 0, 0.25);
-      --text-main: #f1f3f9;
-      --text-muted: #8b92a8;
-      --success: #10b981;
-      --danger: #ef4444;
-      --warning: #f59e0b;
-      --radius: 14px;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
-    body {
-      background: radial-gradient(circle at top right, #1f1a18 0%, var(--bg) 60%);
-      color: var(--text-main);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    header {
-      background: rgba(21, 23, 34, 0.85);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--card-border);
-      padding: 16px 28px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .brand-badge {
-      background: linear-gradient(135deg, #ff8533, #ff5500);
-      color: white;
-      font-weight: 900;
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      display: grid;
-      place-items: center;
-      font-size: 20px;
-      box-shadow: 0 4px 16px var(--accent-glow);
-    }
-
-    .brand-title {
-      font-size: 20px;
-      font-weight: 800;
-      letter-spacing: 1px;
-    }
-
-    .brand-sub {
-      font-size: 11px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .btn {
-      padding: 10px 18px;
-      border-radius: 10px;
-      font-weight: 600;
-      font-size: 14px;
-      border: none;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.2s ease;
-      text-decoration: none;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #ff7a1a, #ff5500);
-      color: white;
-      box-shadow: 0 4px 14px var(--accent-glow);
-    }
-
-    .btn-primary:hover {
-      background: linear-gradient(135deg, #ff8a33, #ff6600);
-      transform: translateY(-1px);
-    }
-
-    .btn-outline {
-      background: transparent;
-      border: 1px solid var(--card-border);
-      color: var(--text-muted);
-    }
-
-    .btn-outline:hover {
-      color: var(--text-main);
-      border-color: #3b415a;
-    }
-
-    main {
-      flex: 1;
-      max-width: 1180px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 28px 20px 60px;
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-
-    /* Live Sync Banner */
-    .sync-banner {
-      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(21, 23, 34, 0.95));
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      border-radius: var(--radius);
-      padding: 18px 24px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    .sync-status {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .pulse-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: var(--success);
-      box-shadow: 0 0 14px var(--success);
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-    }
-
-    .grid-2 {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-      gap: 24px;
-    }
-
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius);
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-    }
-
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--card-border);
-      padding-bottom: 14px;
-    }
-
-    .card-title {
-      font-size: 17px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .card-title svg {
-      color: var(--accent);
-    }
-
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .field label {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
-    .input-text, .select, .textarea {
-      background: #0f1118;
-      border: 1px solid #282c40;
-      border-radius: 10px;
-      padding: 12px 14px;
-      color: var(--text-main);
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.2s;
-      width: 100%;
-    }
-
-    .input-text:focus, .select:focus, .textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-glow);
-    }
-
-    .textarea {
-      resize: vertical;
-      min-height: 80px;
-    }
-
-    .toggle-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      background: #0f1118;
-      border-radius: 10px;
-      border: 1px solid #24283b;
-    }
-
-    .toggle-info h4 {
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    .toggle-info p {
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 48px;
-      height: 26px;
-    }
-
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: #2b3044;
-      transition: .3s;
-      border-radius: 34px;
-    }
-
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 20px;
-      width: 20px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      transition: .3s;
-      border-radius: 50%;
-    }
-
-    input:checked + .slider {
-      background-color: var(--accent);
-    }
-
-    input:checked + .slider:before {
-      transform: translateX(22px);
-    }
-
-    .fallback-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .fallback-item {
-      display: flex;
-      gap: 8px;
-    }
-
-    .btn-danger-icon {
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      color: var(--danger);
-      border-radius: 8px;
-      width: 42px;
-      display: grid;
-      place-items: center;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .btn-danger-icon:hover {
-      background: var(--danger);
-      color: white;
-    }
-
-    #toast {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      background: #151722;
-      border: 1px solid var(--success);
-      color: white;
-      padding: 14px 22px;
-      border-radius: 12px;
-      font-size: 14px;
-      font-weight: 600;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-      display: none;
-      align-items: center;
-      gap: 10px;
-      z-index: 100;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEXO TV · Panel de administración</title>
+<!-- React, ReactDOM, ReactIs, Recharts UMD -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/react-is@18/umd/react-is.production.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --sidebar: #12141b;
+    --surface: #171a22;
+    --surface2: #1e222c;
+    --border: #262b36;
+    --orange: #ff7a2e;
+    --orange-dim: rgba(255,122,46,0.15);
+    --green: #3ddc84;
+    --green-dim: rgba(61,220,132,0.12);
+    --red: #e5493b;
+    --red-dim: rgba(229,73,59,0.12);
+    --blue: #4f8dfd;
+    --text: #ffffff;
+    --muted: #8a90a0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* ---------- Login (pantalla completa, sin sidebar) ---------- */
+  #loginScreen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: radial-gradient(circle at 20% 20%, #1a1f2e 0%, var(--bg) 60%);
+  }
+  #loginScreen .login-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px 28px;
+  }
+  .login-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 26px;
+  }
+  .login-logo .mark {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--orange), #e5493b);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 18px;
+  }
+  .login-logo .name { font-size: 19px; font-weight: 700; }
+  .login-logo .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  /* ---------- Layout general (sidebar + contenido) ---------- */
+  .app { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    padding: 22px 14px;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .sidebar .brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 8px 24px;
+  }
+  .sidebar .brand .mark {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--orange), #e5493b);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px;
+  }
+  .sidebar .brand .name { font-size: 16px; font-weight: 700; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 12px;
+    border-radius: 10px;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.04); }
+  .nav-item.active {
+    background: var(--orange-dim);
+    color: var(--orange);
+  }
+  .nav-item .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 12px 8px 0;
+    border-top: 1px solid var(--border);
+  }
+  .sidebar-footer .admin-email {
+    font-size: 12px; color: var(--muted);
+    word-break: break-all;
+    margin-bottom: 10px;
+  }
+  .main { flex: 1; min-width: 0; }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar h1 { font-size: 19px; margin: 0; }
+  .topbar p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+  .content { padding: 24px 28px 60px; max-width: 1100px; }
+  /* ---------- Tarjetas de estadísticas ---------- */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+  }
+  .stat-card .stat-label {
+    font-size: 12px; color: var(--muted); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .stat-card .stat-value {
+    font-size: 28px; font-weight: 800; margin-top: 6px;
+  }
+  .stat-card.accent-green .stat-value { color: var(--green); }
+  .stat-card.accent-red .stat-value { color: var(--red); }
+  .stat-card.accent-blue .stat-value { color: var(--blue); }
+  .live-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green); margin-right: 5px;
+    animation: livePulse 1.4s infinite;
+  }
+  @keyframes livePulse {
+    0% { box-shadow: 0 0 0 0 rgba(61,220,132,0.55); }
+    70% { box-shadow: 0 0 0 6px rgba(61,220,132,0); }
+    100% { box-shadow: 0 0 0 0 rgba(61,220,132,0); }
+  }
+  .online-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--green); font-weight: 700; margin-top: 3px;
+  }
+  /* ---------- Botón hamburguesa + menú desplegable ---------- */
+  .hamburger-btn {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .menu-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 40;
+  }
+  .menu-overlay.open { display: block; }
+  .menu-drawer {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: 270px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    padding: 20px 14px;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    display: flex;
+    flex-direction: column;
+  }
+  .menu-drawer.open { transform: translateX(0); }
+  .menu-drawer .brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 8px 20px;
+  }
+  .menu-drawer .brand .mark {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--orange), #e5493b);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px;
+  }
+  .menu-drawer .brand .name { font-size: 16px; font-weight: 700; }
+  .menu-drawer .sidebar-footer {
+    margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border);
+  }
+  .menu-drawer .admin-email { font-size: 12px; color: var(--muted); word-break: break-all; margin-bottom: 10px; }
+  .nav-badge {
+    margin-left: auto;
+    background: rgba(255,255,255,0.08);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+  .nav-item.active .nav-badge { background: rgba(255,122,46,0.2); color: var(--orange); }
+  /* ---------- Tarjetas generales ---------- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 15px; margin: 0 0 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+  input::placeholder { color: var(--muted); }
+  input:focus { outline: 2px solid var(--orange); outline-offset: 0; }
+  button {
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: none;
+    background: var(--orange);
+    color: #1a1200;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: filter 0.15s;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.full { width: 100%; }
+  button.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  button.danger { background: var(--red-dim); color: var(--red); }
+  .mode-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .mode-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .mode-btn.active { background: var(--orange-dim); color: var(--orange); border-color: var(--orange); }
+  .credentials-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 8px;
+    font-size: 12px;
+    font-family: ui-monospace, monospace;
+    word-break: break-all;
+    display: none;
+    width: 100%;
+    flex-basis: 100%;
+  }
+  #error { color: var(--red); font-size: 13px; margin-top: 10px; }
+  /* ---------- Tabla ---------- */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; margin-top: 4px; min-width: 640px; }
+  th, td { text-align: left; padding: 12px 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+  .code-cell { font-family: ui-monospace, monospace; font-size: 15px; letter-spacing: 1px; font-weight: 700; }
+  .badge {
+    display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  }
+  .badge.active { background: var(--green-dim); color: var(--green); }
+  .badge.revoked { background: var(--red-dim); color: var(--red); }
+  .device-count { color: var(--muted); font-size: 11px; margin-top: 3px; }
+  .actions-cell { display: flex; flex-wrap: wrap; gap: 6px; }
+  .actions-cell button { width: auto; padding: 7px 11px; font-size: 12px; }
+  #copyToast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--green); color: #06210f; padding: 11px 20px; border-radius: 30px;
+    font-size: 14px; font-weight: 700; display: none; z-index: 50;
+  }
+  @media (max-width: 720px) {
+    .sidebar { display: none; }
+    .content { padding: 18px; }
+    .topbar { padding: 16px 18px; }
+  }
+</style>
 </head>
 <body>
-
-  <header>
-    <div class="brand">
-      <div class="brand-badge">N</div>
+<!-- ---------- LOGIN ---------- -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="mark">N</div>
       <div>
-        <div class="brand-title">NEXO TV</div>
-        <div class="brand-sub">Panel en Vivo — Firebase Realtime</div>
+        <div class="name">NEXO TV</div>
+        <div class="sub">Panel de administración</div>
       </div>
     </div>
-    <div class="header-actions">
-      <button class="btn btn-outline" onclick="loadFromFirebase()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-        Recargar
-      </button>
-      <button class="btn btn-primary" onclick="saveToFirebase()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
-        Aplicar Cambios en Vivo
-      </button>
+    <input id="email" type="text" placeholder="Correo (principal) o usuario (sub administrador)" autocomplete="username" />
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" />
+    <button id="loginBtn" class="full">Iniciar sesión</button>
+    <div id="error"></div>
+  </div>
+</div>
+<!-- ---------- APP (menú hamburguesa + panel), visible tras iniciar sesión ---------- -->
+<div class="app" id="appShell" style="display:none;">
+  <div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
+  <div class="menu-drawer" id="menuDrawer">
+    <div class="brand">
+      <div class="mark">N</div>
+      <div class="name">NEXO TV</div>
     </div>
-  </header>
-
-  <main>
-    <!-- Live Firebase Banner -->
-    <div class="sync-banner">
-      <div class="sync-status">
-        <div class="pulse-dot" id="liveDot"></div>
-        <div>
-          <div style="font-weight: 700; font-size: 14px;" id="liveStatusText">Conectado en tiempo real a Firebase</div>
-          <div style="font-size: 12px; color: var(--text-muted);">Los cambios se transmiten instantáneamente a todos los televisores conectados.</div>
+    <nav>
+      <div class="nav-item" id="nav-home" onclick="selectView('home')"><span class="dot"></span> Inicio</div>
+      <div class="nav-item" id="nav-create" onclick="selectView('create')"><span class="dot"></span> Crear cliente</div>
+      <div class="nav-item" id="nav-active" onclick="selectView('active')"><span class="dot"></span> Clientes activos<span class="nav-badge" id="badge-active">0</span></div>
+      <div class="nav-item" id="nav-expiring" onclick="selectView('expiring')"><span class="dot"></span> Clientes por vencer<span class="nav-badge" id="badge-expiring">0</span></div>
+      <div class="nav-item" id="nav-expired" onclick="selectView('expired')"><span class="dot"></span> Clientes vencidos<span class="nav-badge" id="badge-expired">0</span></div>
+      <div class="nav-item" id="nav-demos" onclick="selectView('demos')"><span class="dot"></span> Demos<span class="nav-badge" id="badge-demos">0</span></div>
+      <div class="nav-item" id="nav-notifications" onclick="selectView('notifications')"><span class="dot"></span> Notificaciones<span class="nav-badge" id="badge-notifications">0</span></div>
+      <div class="nav-item" id="nav-servers" onclick="selectView('servers')"><span class="dot"></span> Servidores</div>
+      <div class="nav-item" id="nav-subadmins" onclick="selectView('subadmins')"><span class="dot"></span> Paneles sub administrador</div>
+      <div class="nav-item" id="nav-whatsapp" onclick="selectView('whatsapp')"><span class="dot"></span> WhatsApp Automático</div>
+      <div class="nav-item" id="nav-nexocontrol" onclick="selectView('nexocontrol')"><span class="dot"></span> 📺 Control Remoto Nexo TV</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-email" id="adminEmail"></div>
+      <button class="secondary full" id="logout">Cerrar sesión</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <button class="hamburger-btn" onclick="openMenu()">☰</button>
+      <div>
+        <h1 id="viewTitle">Inicio</h1>
+        <p id="viewSubtitle">Panel general y estadísticas</p>
+      </div>
+    </div>
+    <div class="content">
+      <!-- ---------- Estadísticas: visibles solo en Inicio ---------- -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-label">Códigos totales</div>
+          <div class="stat-value" id="statTotal">0</div>
+        </div>
+        <div class="stat-card accent-green">
+          <div class="stat-label">Activos generales</div>
+          <div class="stat-value" id="statActive">0</div>
+        </div>
+        <div class="stat-card accent-green" style="cursor:pointer;" onclick="selectView('active')">
+          <div class="stat-label">Clientes activos</div>
+          <div class="stat-value" id="statActiveClients">0</div>
+        </div>
+        <div class="stat-card accent-orange" style="cursor:pointer;" onclick="selectView('expiring')">
+          <div class="stat-label">Clientes por vencer</div>
+          <div class="stat-value" id="statExpiringClients">0</div>
+        </div>
+        <div class="stat-card accent-red" style="cursor:pointer;" onclick="selectView('expired')">
+          <div class="stat-label">Clientes vencidos</div>
+          <div class="stat-value" id="statExpiredClients">0</div>
+        </div>
+        <div class="stat-card accent-blue" style="cursor:pointer;" onclick="selectView('demos')">
+          <div class="stat-label">Demos</div>
+          <div class="stat-value" id="statDemos">0</div>
+        </div>
+        <div class="stat-card accent-red">
+          <div class="stat-label">Revocados</div>
+          <div class="stat-value" id="statRevoked">0</div>
+        </div>
+        <div class="stat-card accent-blue">
+          <div class="stat-label">Dispositivos registrados</div>
+          <div class="stat-value" id="statDevices">0</div>
+        </div>
+        <div class="stat-card accent-green" style="cursor:pointer;" onclick="selectView('online')">
+          <div class="stat-label"><span class="live-dot"></span> En línea ahora</div>
+          <div class="stat-value" id="statOnline">0</div>
         </div>
       </div>
-      <div style="font-size: 12px; color: #a1a1aa; font-family: monospace;" id="lastUpdateLabel">Actualizado: --</div>
-    </div>
-
-    <!-- Main Grid -->
-    <div class="grid-2">
-
-      <!-- Servidores IPTV -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
-            Servidores Xtream / IPTV
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="primaryServer">Servidor Primario (Por defecto en la App)</label>
-          <input type="text" id="primaryServer" class="input-text" placeholder="http://servidor:8080" />
-        </div>
-
-        <div class="field">
-          <label for="backupServer">Servidor de Respaldo</label>
-          <input type="text" id="backupServer" class="input-text" placeholder="https://servidor-backup.com" />
-        </div>
-
-        <div class="field">
-          <label>Servidores Alternativos / Fallbacks</label>
-          <div class="fallback-list" id="fallbackList"></div>
-          <button class="btn btn-outline" style="margin-top: 8px;" onclick="addFallback()">
-            + Agregar Servidor Alternativo
-          </button>
-        </div>
+      <!-- Gráfico de crecimiento de códigos en los últimos 30 días -->
+      <div class="card" id="homeChartCard" style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px 24px; margin-bottom:24px;">
+        <h3 style="font-size:16px; font-weight:700; margin:0 0 16px; color:var(--text);">Crecimiento de nuevos códigos (Últimos 30 días)</h3>
+        <div id="rechartsGrowthChart" style="width:100%; height:280px;"></div>
+      </div>
+      <!-- ---------- Vista: Usuarios en línea ---------- -->
+      <div class="card view-section" id="view-online" style="display:none;">
+        <div id="view-online-content"></div>
       </div>
 
-      <!-- Ajustes del Reproductor & Canales -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Streaming y Reproductor
-          </div>
+      <!-- ---------- Vista: Crear cliente nuevo ---------- -->
+      <div class="card view-section" id="view-create">
+        <h2>Generar nuevo código</h2>
+        <input id="clientName" type="text" placeholder="Nombre del cliente" required />
+        <input id="clientPhone" type="tel" placeholder="Teléfono (WhatsApp) con código de país, ej. 56912345678" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+        <div id="serverSelectRow">
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor / lista</label>
+          <select id="serverSelect" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" onchange="onServerSelectChange()">
+          <option value="">Selecciona uno...</option>
+          </select>
         </div>
-
-        <div class="field">
-          <label for="liveBuffer">Buffer de Transmisión en Vivo (ms)</label>
-          <input type="number" id="liveBuffer" class="input-text" min="100" max="5000" step="50" value="350" />
-          <span style="font-size: 11px; color: var(--text-muted);">Recomendado: 350 ms para zapping rápido y absorción de jitter.</span>
+        <!-- Solo aparecen si el servidor/lista elegido es de tipo Xtream Codes -->
+        <div id="xtreamCredFields" style="display:none;">
+          <input id="username" type="text" placeholder="Usuario" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <input id="xtreamPassword" type="text" placeholder="Contraseña" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
         </div>
-
-        <div class="toggle-row">
-          <div class="toggle-info">
-            <h4>Reconexión Automática</h4>
-            <p>Reconectar de inmediato si el canal se congela o corta</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="autoReconnect" checked>
-            <span class="slider"></span>
+        <div id="useSecondSourceRow">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
+            <input type="checkbox" id="useSecondSource" style="width:auto; margin:0;" onchange="onUseSecondSourceChange()" />
+            Juntar con un segundo servidor o lista (el cliente ve el contenido de ambos junto)
           </label>
         </div>
-
-        <div class="field">
-          <label for="featuredChannelId">ID de Canal Forzado en el Home (Opcional)</label>
-          <input type="text" id="featuredChannelId" class="input-text" placeholder="Dejar vacío para reproducir el último visto" />
+        <div id="secondSourceBox" style="display:none;">
+          <div id="serverSelect2Row">
+            <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor / lista adicional</label>
+            <select id="serverSelect2" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" onchange="onServerSelect2Change()">
+              <option value="">Selecciona uno...</option>
+            </select>
+          </div>
+          <div id="xtreamCredFields2" style="display:none;">
+            <input id="username2" type="text" placeholder="Usuario" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+            <input id="xtreamPassword2" type="text" placeholder="Contraseña" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          </div>
+        </div>
+        <div id="expirationDateBox">
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Fecha de vencimiento (opcional)</label>
+          <input id="expirationDate" type="date" />
+        </div>
+        <div style="margin: 12px 0;">
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Servicios permitidos para el cliente</label>
+          <div style="display:flex; gap:16px; flex-wrap:wrap;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer;">
+              <input type="checkbox" id="allowTv" style="width:auto; margin:0;" checked /> TV / En vivo
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer;">
+              <input type="checkbox" id="allowMovies" style="width:auto; margin:0;" checked /> Películas
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer;">
+              <input type="checkbox" id="allowSeries" style="width:auto; margin:0;" checked /> Series
+            </label>
+          </div>
+        </div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
+          <input type="checkbox" id="isDemo" style="width:auto; margin:0;" onchange="onDemoCheckChange()" />
+          Marcar como cuenta demo
+        </label>
+        <div id="demoDurationBox" style="display:none;">
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Duración de la demo</label>
+          <div class="mode-row">
+            <button type="button" id="demo3hBtn" class="mode-btn active" onclick="setDemoHours(3)">3 horas</button>
+            <button type="button" id="demo5hBtn" class="mode-btn" onclick="setDemoHours(5)">5 horas</button>
+            <button type="button" id="demo12hBtn" class="mode-btn" onclick="setDemoHours(12)">12 horas</button>
+          </div>
+        </div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
+          <input type="checkbox" id="sendWhatsapp" style="width:auto; margin:0;" checked />
+          Abrir WhatsApp con el código listo para enviar al cliente
+        </label>
+        <button id="generateBtn" class="full">Generar nuevo código</button>
+      </div>
+      <!-- ---------- Vistas con tabla filtrada: activos / por vencer / vencidos / demos ---------- -->
+      <div class="card view-section" id="view-table" style="display:none;">
+        <h2 id="tableCardTitle">Clientes</h2>
+        <input id="searchInput" type="text" placeholder="Buscar por código o nombre de cliente..." oninput="renderCodes()" />
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Código</th><th>Cliente</th><th>Estado</th><th>Vence</th><th>Acciones</th></tr>
+            </thead>
+            <tbody id="codesTableBody">
+              <tr><td colspan="5" style="color:var(--muted)">Cargando códigos...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
-
-      <!-- Avisos y Mensajes en Pantalla -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            Avisos Globales a Usuarios
+      <!-- ---------- Vista: Paneles sub administrador ---------- -->
+      <!-- ---------- Vista: Servidores Xtream (solo el administrador principal las administra) ---------- -->
+      <div class="card view-section" id="view-servers" style="display:none;">
+        <h2>Servidores y listas guardadas</h2>
+        <p style="color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:16px;">
+          Guarda acá tus servidores Xtream o listas M3U con un nombre — los sub administradores
+          solo van a ver el nombre al generar un código, nunca la URL real.
+        </p>
+        <div id="serverCreateBox">
+          <div class="mode-row">
+            <button type="button" id="serverTypeXtreamBtn" class="mode-btn active" onclick="setServerType('xtream')">Servidor Xtream Codes</button>
+            <button type="button" id="serverTypeM3uBtn" class="mode-btn" onclick="setServerType('m3u')">Lista M3U</button>
           </div>
-        </div>
-
-        <div class="toggle-row">
-          <div class="toggle-info">
-            <h4>Mostrar Aviso Global en Pantalla</h4>
-            <p>Aparece como notificación para todos los usuarios en sus televisores</p>
+          <input id="serverName" type="text" placeholder="Nombre para identificarlo (ej. Servidor Principal)" />
+          <input id="serverHost" type="text" placeholder="URL del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Ocultar secciones completas (opcional)</label>
+          <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;">
+              <input type="checkbox" id="hideTypeLive" style="width:auto; margin:0;" /> Ocultar TV Vivo
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;">
+              <input type="checkbox" id="hideTypeMovie" style="width:auto; margin:0;" /> Ocultar Películas
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;">
+              <input type="checkbox" id="hideTypeSeries" style="width:auto; margin:0;" /> Ocultar Series
+            </label>
           </div>
-          <label class="switch">
-            <input type="checkbox" id="announcementEnabled">
-            <span class="slider"></span>
-          </label>
+          <button id="createServerBtn" class="full">Guardar</button>
         </div>
-
-        <div class="field">
-          <label for="announcementTitle">Título del Aviso</label>
-          <input type="text" id="announcementTitle" class="input-text" placeholder="Ej. Actualización de Canales" />
-        </div>
-
-        <div class="field">
-          <label for="announcementMsg">Mensaje</label>
-          <textarea id="announcementMsg" class="textarea" placeholder="Escribe el mensaje que verán los usuarios en su TV..."></textarea>
+        <p id="serverBlockedMessage" style="display:none; color:var(--muted); font-size:14px; line-height:1.6;">
+          Solo el administrador principal puede agregar o editar servidores y listas.
+        </p>
+        <div class="table-wrap" style="margin-top:20px;">
+          <table>
+            <thead><tr><th>Nombre</th><th>Tipo</th><th id="serverUrlHeader">URL</th><th>Acciones</th></tr></thead>
+            <tbody id="serversTableBody">
+              <tr><td colspan="4" style="color:var(--muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
+      <!-- ---------- Combos: 2 servidores/listas ya guardados, combinados con un nombre ---------- -->
+      <div class="card view-section" id="view-servers-combo" style="display:none;">
+        <h2>Combos (servidores mixtos)</h2>
+        <p style="color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:16px;">
+          Junta 2 servidores/listas que ya tengas guardados en uno solo con su propio nombre —
+          así, al crear un cliente, eliges el combo directo en vez de armar la combinación cada vez.
+        </p>
+        <div id="comboCreateBox">
+          <input id="comboName" type="text" placeholder="Nombre del combo (ej. Full + Deportes)" />
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Primer servidor / lista</label>
+          <select id="comboServer1" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;">
+            <option value="">Selecciona uno...</option>
+          </select>
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Segundo servidor / lista</label>
+          <select id="comboServer2" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;">
+            <option value="">Selecciona uno...</option>
+          </select>
+          <button id="createComboBtn" class="full">Guardar combo</button>
+        </div>
+        <p id="comboBlockedMessage" style="display:none; color:var(--muted); font-size:14px; line-height:1.6;">
+          Solo el administrador principal puede crear combos.
+        </p>
+        <div class="table-wrap" style="margin-top:20px;">
+          <table>
+            <thead><tr><th>Nombre</th><th>Combina</th><th>Acciones</th></tr></thead>
+            <tbody id="combosTableBody">
+              <tr><td colspan="3" style="color:var(--muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card view-section" id="view-subadmins" style="display:none;">
+        <h2>Paneles sub administrador</h2>
+        <!-- Se muestra solo si eres el administrador principal -->
+        <div id="subadminCreateBox">
+          <input id="subadminUsername" type="text" placeholder="Usuario del sub administrador (sin espacios)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <input id="subadminPassword" type="text" placeholder="Contraseña (mínimo 6 caracteres)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor/lista que va a poder usar (solo ese, no ve los demás)</label>
+          <select id="subadminServerSelect" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;">
+            <option value="">Selecciona uno...</option>
+          </select>
+          <button id="createSubadminBtn" class="full">Crear sub administrador</button>
+          <div id="subadminError" style="color:var(--red); font-size:13px; margin-top:10px;"></div>
+        </div>
+        <!-- Se muestra si NO eres el administrador principal -->
+        <p id="subadminBlockedMessage" style="display:none; color:var(--muted); font-size:14px; line-height:1.6;">
+          Solo el administrador principal puede crear otros sub administradores.
+        </p>
+      </div>
+      <div class="card view-section" id="view-subadmins-list" style="display:none;">
+        <h2>Sub administradores existentes</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Usuario</th><th>Creado</th><th>Servidor</th><th>Acciones</th></tr></thead>
+            <tbody id="subadminsTableBody">
+              <tr><td colspan="4" style="color:var(--muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card view-section" id="view-whatsapp" style="display:none;">
+        <h2>Plantilla y configuración de WhatsApp automático (Vencimiento en 3 días)</h2>
+        <p style="color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:16px;">
+          Configura el mensaje de WhatsApp que se enviará a los clientes cuya suscripción vencerá exactamente en 3 días.
+        </p>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); margin: 4px 0 16px; cursor:pointer; font-weight:600;">
+          <input type="checkbox" id="whatsappAutoEnabled" style="width:auto; margin:0;" />
+          Activar recordatorios automáticos de WhatsApp para vencimiento en 3 días
+        </label>
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Plantilla del mensaje</label>
+        <textarea id="whatsappTemplate" rows="5" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px; resize:vertical; font-family:inherit;"></textarea>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:16px; line-height:1.5;">
+          Variables disponibles: <code>{clientName}</code>, <code>{code}</code>, <code>{expirationDate}</code>, <code>{daysLeft}</code>
+        </div>
+        <button id="saveWhatsappConfigBtn" class="full" style="margin-bottom:24px;">Guardar configuración</button>
 
-      <!-- Modo Mantenimiento -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            Modo Mantenimiento
+        <h3 style="font-size:15px; margin:0 0 12px; color:var(--text);">Clientes que vencen en 3 días</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Código</th><th>Cliente</th><th>Teléfono</th><th>Vence</th><th>Acción WhatsApp</th></tr>
+            </thead>
+            <tbody id="whatsappExpiringTableBody">
+              <tr><td colspan="5" style="color:var(--muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card view-section" id="view-notifications" style="display:none;">
+        <h2>Centro de Notificaciones y Gestión Masiva</h2>
+        <p style="color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:16px;">
+          Envía avisos masivos o recordatorios de WhatsApp para todos los clientes que se encuentran en el estado 'por vencer' hoy.
+        </p>
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Título del aviso / notificación</label>
+        <input id="notifTitleInput" type="text" value="¡Tu suscripción vence hoy!" placeholder="Título..." />
+        
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Mensaje / Cuerpo del aviso</label>
+        <textarea id="notifMessageInput" rows="4" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px; resize:vertical; font-family:inherit;">Estimado/a *{clientName}*, le recordamos cordialmente que su suscripción en *NEXO TV* con código *{code}* vence el día de hoy (*{expirationDate}*) 🚨.\n\nPor favor, contáctenos para realizar su renovación y continuar disfrutando de su servicio sin interrupciones. 📺✨\n\nAgradecemos su confianza. ¡Quedamos a su entera disposición! 🙌</textarea>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:16px;">Variables disponibles: <code>{clientName}</code>, <code>{code}</code>, <code>{expirationDate}</code></div>
+
+        <div style="display:flex; gap:10px; margin-bottom:24px;">
+          <button id="sendBulkWhatsappBtn" style="background:#25D366; color:#fff; flex:1;" onclick="sendBulkWhatsappToday()">Enviar WhatsApp Masivo a Clientes de Hoy</button>
+        </div>
+
+        <h3 style="font-size:15px; margin:0 0 12px; color:var(--text);">Clientes que vencen hoy (<span id="notifTodayCount">0</span>)</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Código</th><th>Cliente</th><th>Teléfono</th><th>Vence</th><th>Acción WhatsApp</th></tr>
+            </thead>
+            <tbody id="notificationsTableBody">
+              <tr><td colspan="5" style="color:var(--muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- ---------- Vista: Control Remoto Nexo TV ---------- -->
+      <div class="card view-section" id="view-nexocontrol" style="display:none;">
+        <h2>Control Remoto Nexo TV en Vivo</h2>
+        <p style="color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:16px;">
+          Administra servidores, buffer, avisos y modo mantenimiento en tiempo real para todos los televisores.
+        </p>
+
+        <!-- Live Sync Banner -->
+        <div style="background:linear-gradient(135deg, rgba(61, 220, 132, 0.08), rgba(23, 26, 34, 0.95)); border:1px solid rgba(61, 220, 132, 0.3); border-radius:12px; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span class="live-dot" id="nexoLiveDot"></span>
+            <div>
+              <div style="font-weight:700; font-size:14px;" id="nexoLiveStatusText">Conectado en tiempo real a Firebase</div>
+              <div style="font-size:12px; color:var(--muted);">Cualquier cambio se transmite instantáneamente al TV Box sin reiniciar.</div>
+            </div>
+          </div>
+          <div style="font-size:12px; color:var(--muted); font-family:monospace;" id="nexoLastUpdateLabel">Actualizado: --</div>
+        </div>
+
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor Primario (Por defecto en la App)</label>
+        <input id="nexoPrimaryServer" type="text" placeholder="http://eliteplusec.com:8080" />
+
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor de Respaldo</label>
+        <input id="nexoBackupServer" type="text" placeholder="https://nexo.fusionx.cl" />
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:12px;">
+          <div>
+            <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Buffer de Transmisión (ms)</label>
+            <input id="nexoLiveBuffer" type="number" min="100" max="5000" step="50" value="350" />
+          </div>
+          <div>
+            <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">ID de Canal Forzado en el Home</label>
+            <input id="nexoFeaturedChannelId" type="text" placeholder="Vacío = último visto" />
           </div>
         </div>
 
-        <div class="toggle-row">
-          <div class="toggle-info">
-            <h4>Activar Bloqueo por Mantenimiento</h4>
-            <p>Pausa temporalmente el acceso con aviso explicativo en pantalla</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="maintenanceEnabled">
-            <span class="slider"></span>
-          </label>
-        </div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); margin-bottom:16px; cursor:pointer;">
+          <input type="checkbox" id="nexoAutoReconnect" style="width:auto; margin:0;" checked />
+          Reconexión Automática sin cortes si el canal se congela
+        </label>
 
-        <div class="field">
-          <label for="maintenanceTitle">Título de Mantenimiento</label>
-          <input type="text" id="maintenanceTitle" class="input-text" placeholder="Ej. Mantenimiento del Sistema" />
-        </div>
+        <!-- Avisos en Pantalla -->
+        <h3 style="font-size:15px; margin:16px 0 10px; color:var(--text); border-top:1px solid var(--border); padding-top:16px;">
+          Aviso en Pantalla en Vivo (Notificación Flotante en TV)
+        </h3>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); margin-bottom:10px; cursor:pointer;">
+          <input type="checkbox" id="nexoAnnouncementEnabled" style="width:auto; margin:0;" />
+          Mostrar aviso a todos los usuarios en sus televisores
+        </label>
+        <input id="nexoAnnouncementTitle" type="text" placeholder="Título del aviso (ej. Canales Actualizados)" />
+        <textarea id="nexoAnnouncementMsg" rows="3" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:16px; resize:vertical; font-family:inherit;" placeholder="Mensaje que aparecerá en el televisor..."></textarea>
 
-        <div class="field">
-          <label for="maintenanceMsg">Mensaje</label>
-          <textarea id="maintenanceMsg" class="textarea" placeholder="Estamos mejorando los servidores. Volvemos en breve."></textarea>
-        </div>
+        <!-- Modo Mantenimiento -->
+        <h3 style="font-size:15px; margin:16px 0 10px; color:var(--text); border-top:1px solid var(--border); padding-top:16px;">
+          Modo Mantenimiento (Bloqueo en Pantalla)
+        </h3>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); margin-bottom:10px; cursor:pointer;">
+          <input type="checkbox" id="nexoMaintenanceEnabled" style="width:auto; margin:0;" />
+          Activar bloqueo por mantenimiento en la App
+        </label>
+        <input id="nexoMaintenanceTitle" type="text" placeholder="Título (ej. Mantenimiento del Sistema)" />
+        <textarea id="nexoMaintenanceMsg" rows="3" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:20px; resize:vertical; font-family:inherit;" placeholder="Mensaje explicativo..."></textarea>
+
+        <button id="saveNexoRemoteConfigBtn" class="full" onclick="saveNexoRemoteConfig()">⚡ Transmitir en Vivo a los Televisores</button>
       </div>
 
     </div>
-  </main>
-
-  <div id="toast">⚡ ¡Configuración actualizada en vivo en Firebase!</div>
-
-  <script>
-    const FIREBASE_URL = 'https://nexo-tv-d8766-default-rtdb.firebaseio.com/config.json';
-    let configData = {
-      updatedAt: new Date().toISOString(),
-      servers: {
-        primary: "http://eliteplusec.com:8080",
-        backup: "https://nexo.fusionx.cl",
-        fallbacks: ["http://eliteplusec.com", "http://eliteplusec.com:80"]
-      },
-      maintenance: {
-        enabled: false,
-        title: "Mantenimiento del Sistema",
-        message: "Estamos realizando mejoras en el servicio. Volveremos en breve."
-      },
-      announcement: {
-        enabled: false,
-        id: "notice-1",
-        title: "Aviso Importante",
-        message: "Bienvenido a Nexo TV. Disfruta de la mejor programación.",
-        type: "info"
-      },
-      settings: {
-        liveBufferMs: 350,
-        autoReconnect: true,
-        featuredChannelId: ""
-      }
-    };
-
-    function showToast(msg) {
-      const toast = document.getElementById('toast');
-      toast.innerText = msg;
-      toast.style.display = 'flex';
-      setTimeout(() => { toast.style.display = 'none'; }, 3500);
-    }
-
-    function renderFallbacks() {
-      const container = document.getElementById('fallbackList');
-      container.innerHTML = '';
-      (configData.servers.fallbacks || []).forEach((url, index) => {
-        const item = document.createElement('div');
-        item.className = 'fallback-item';
-        item.innerHTML = `
-          <input type="text" class="input-text" value="${url}" oninput="configData.servers.fallbacks[${index}] = this.value" />
-          <button class="btn-danger-icon" onclick="removeFallback(${index})">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        `;
-        container.appendChild(item);
+  </div>
+</div>
+<div id="copyToast">Código copiado</div>
+<!-- Firebase (SDK compat, sin necesidad de bundler) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  // =========================================================================
+  // 1) PEGA AQUI la configuracion de tu proyecto de Firebase
+  //    (Consola de Firebase -> Configuracion del proyecto -> tus apps -> SDK setup)
+  // =========================================================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyCUVh9xAH_9Fc7V3ng21OvInhzwjO1NmRg",
+    authDomain: "jetgo-f0127.firebaseapp.com",
+    projectId: "jetgo-f0127",
+    storageBucket: "jetgo-f0127.firebasestorage.app",
+    messagingSenderId: "880287180978",
+    appId: "1:880287180978:web:019ab79dd76a24d96e81ab"
+  };
+  // =========================================================================
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  // Los sub administradores inician sesión con "usuario" en vez de correo — por dentro,
+  // Firebase Auth sigue necesitando algo con forma de correo, así que se arma uno interno
+  // pegándole este dominio (el sub administrador nunca lo ve ni lo necesita saber).
+  const SUBADMIN_EMAIL_DOMAIN = '@subadmin.nexo.internal';
+  const loginScreen = document.getElementById('loginScreen');
+  const appShell = document.getElementById('appShell');
+  const errorEl = document.getElementById('error');
+  document.getElementById('loginBtn').addEventListener('click', () => {
+    const input = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    errorEl.textContent = '';
+    // Si lo que escribió no tiene forma de correo (no tiene "@"), es un sub administrador
+    // iniciando con su usuario — se arma el correo interno automáticamente por dentro.
+    const email = input.includes('@') ? input : input.toLowerCase().replace(/\s+/g, '') + SUBADMIN_EMAIL_DOMAIN;
+    auth.signInWithEmailAndPassword(email, password)
+      .catch(err => {
+        if (!input.includes('@')) {
+          const fallbackEmail = input.toLowerCase().replace(/\s+/g, '') + '@subadmin.jetgo.internal';
+          return auth.signInWithEmailAndPassword(fallbackEmail, password)
+            .catch(() => {
+              errorEl.textContent = 'Usuario o contraseña incorrectos.';
+            });
+        }
+        errorEl.textContent = 'No se pudo iniciar sesión: ' + err.message;
       });
+  });
+  document.getElementById('logout').addEventListener('click', () => auth.signOut());
+  let currentUserRole = 'admin'; // por defecto, hasta que se confirme contra Firestore
+  let currentAssignedServerId = null; // solo aplica si currentUserRole === 'subadmin'
+  auth.onAuthStateChanged(async user => {
+    if (user) {
+      // Revisa si esta cuenta tiene un rol asignado (sub administrador) o si fue revocada
+      let currentUsername = null;
+      try {
+        const adminDoc = await db.collection('admins').doc(user.uid).get();
+        if (adminDoc.exists) {
+          const adminData = adminDoc.data();
+          if (adminData.revoked === true) {
+            errorEl.textContent = 'Tu acceso a este panel fue revocado.';
+            await auth.signOut();
+            return;
+          }
+          currentUserRole = adminData.role || 'subadmin';
+          currentAssignedServerId = adminData.assignedServerId || null;
+          currentUsername = adminData.username || null;
+        } else {
+          currentUserRole = 'admin'; // cuenta principal (sin documento propio)
+          currentAssignedServerId = null;
+        }
+      } catch (e) {
+        currentUserRole = 'admin';
+        currentAssignedServerId = null;
+      }
+      document.getElementById('subadminCreateBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
+      document.getElementById('subadminBlockedMessage').style.display = currentUserRole === 'admin' ? 'none' : 'block';
+      // Un sub administrador ni siquiera ve esta opción en el menú
+      document.getElementById('nav-subadmins').style.display = currentUserRole === 'admin' ? 'flex' : 'none';
+      // Solo el principal ve el menú de Servidores y la opción de URL suelta al crear un código
+      document.getElementById('nav-servers').style.display = currentUserRole === 'admin' ? 'flex' : 'none';
+      document.getElementById('serverCreateBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
+      document.getElementById('serverBlockedMessage').style.display = currentUserRole === 'admin' ? 'none' : 'block';
+      document.getElementById('serverUrlHeader').style.display = currentUserRole === 'admin' ? '' : 'none';
+      document.getElementById('comboCreateBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
+      document.getElementById('comboBlockedMessage').style.display = currentUserRole === 'admin' ? 'none' : 'block';
+      loginScreen.style.display = 'none';
+      appShell.style.display = 'flex';
+      document.getElementById('adminEmail').textContent = currentUsername || user.email || '';
+      selectView('home');
+      listenToCodes();
+      // Se esperan las 2 cargas (servidores y combos) ANTES de dibujar el desplegable de
+      // "Crear cliente nuevo" — si se dibuja antes de que termine de cargar la lista de
+      // combos, un sub administrador con un combo asignado puede quedar sin nada
+      // seleccionado (y por lo tanto, sin pedirle usuario/clave de ningún servidor).
+      Promise.all([loadServers(), loadCombos()]).then(() => {
+        renderServerDropdown();
+        renderSubadminServerDropdown();
+        applyAssignedSourceForSubadmin();
+      });
+    } else {
+      loginScreen.style.display = 'flex';
+      appShell.style.display = 'none';
+    }
+  });
+  // ---------- Elegir un servidor o lista del desplegable: muestra usuario/clave solo si es Xtream ----------
+  function onServerSelectChange() {
+    const select = document.getElementById('serverSelect');
+    // Para un sub administrador se usa directo lo que tiene asignado (no lo que diga el
+    // <select>, que puede no reflejarlo bien en algunos casos) — así los campos de usuario/
+    // clave siempre se muestran, sin depender de que el desplegable se haya sincronizado bien.
+    const value = currentUserRole === 'subadmin' ? (currentAssignedServerId || '') : select.value;
+    if (value.startsWith('combo::')) {
+      // Es un combo: se muestran los campos de usuario/clave que correspondan según el tipo
+      // de cada uno de los 2 servidores que lo componen, y se oculta la opción manual de
+      // "segundo servidor" (el combo ya trae los 2 fijos).
+      const comboId = value.substring('combo::'.length);
+      const combo = combosList.find(c => c.id === comboId);
+      const member1 = combo ? serversList.find(s => s.id === combo.memberIds[0]) : null;
+      const member2 = combo ? serversList.find(s => s.id === combo.memberIds[1]) : null;
+      document.getElementById('xtreamCredFields').style.display = (member1 && member1.type !== 'm3u') ? 'block' : 'none';
+      document.getElementById('useSecondSourceRow').style.display = 'none';
+      document.getElementById('secondSourceBox').style.display = 'block';
+      document.getElementById('serverSelect2Row').style.display = 'none';
+      document.getElementById('xtreamCredFields2').style.display = (member2 && member2.type !== 'm3u') ? 'block' : 'none';
+      return;
+    }
+    document.getElementById('useSecondSourceRow').style.display = currentUserRole === 'subadmin' ? 'none' : 'block';
+    document.getElementById('serverSelect2Row').style.display = 'block';
+    onUseSecondSourceChange();
+    const selected = serversList.find(s => s.host === value);
+    const isXtream = selected ? selected.type !== 'm3u' : false;
+    document.getElementById('xtreamCredFields').style.display = isXtream ? 'block' : 'none';
+  }
+  window.onServerSelectChange = onServerSelectChange;
+
+  /** Respaldo explícito para sub administradores: fuerza el valor del servidor/combo que
+   *  tienen asignado directamente (sin depender de que el <select> lo haya "recordado" bien
+   *  entre varios re-dibujados), y muestra los campos de usuario/clave que correspondan. */
+  function applyAssignedSourceForSubadmin() {
+    if (currentUserRole !== 'subadmin' || !currentAssignedServerId) return;
+    const select = document.getElementById('serverSelect');
+    if (!select) return;
+
+    if (currentAssignedServerId.startsWith('combo::')) {
+      select.value = currentAssignedServerId;
+    } else {
+      const server = serversList.find(s => s.id === currentAssignedServerId);
+      if (server) select.value = server.host;
+    }
+    onServerSelectChange();
+  }
+  // ---------- Alternar tipo al GUARDAR un servidor/lista nuevo (sección Servidores) ----------
+  let newServerType = 'xtream';
+  function setServerType(type) {
+    newServerType = type;
+    document.getElementById('serverTypeXtreamBtn').classList.toggle('active', type === 'xtream');
+    document.getElementById('serverTypeM3uBtn').classList.toggle('active', type === 'm3u');
+    document.getElementById('serverHost').placeholder = type === 'xtream'
+      ? 'URL del servidor (http://servidor.com:8080)'
+      : 'URL de la lista M3U';
+  }
+  window.setServerType = setServerType;
+  // ---------- Duración de la demo (3, 5 o 12 horas) ----------
+  let demoHours = 3;
+  function setDemoHours(hours) {
+    demoHours = hours;
+    document.getElementById('demo3hBtn').classList.toggle('active', hours === 3);
+    document.getElementById('demo5hBtn').classList.toggle('active', hours === 5);
+    document.getElementById('demo12hBtn').classList.toggle('active', hours === 12);
+  }
+  window.setDemoHours = setDemoHours;
+  function onDemoCheckChange() {
+    const isDemo = document.getElementById('isDemo').checked;
+    document.getElementById('demoDurationBox').style.display = isDemo ? 'block' : 'none';
+    // Una demo se vence por horas, no por fecha — se ocultan para no mezclar los dos sistemas
+    document.getElementById('expirationDateBox').style.display = isDemo ? 'none' : 'block';
+  }
+  window.onDemoCheckChange = onDemoCheckChange;
+  // ---------- Menú hamburguesa: abrir/cerrar ----------
+  function openMenu() {
+    document.getElementById('menuDrawer').classList.add('open');
+    document.getElementById('menuOverlay').classList.add('open');
+  }
+  function closeMenu() {
+    document.getElementById('menuDrawer').classList.remove('open');
+    document.getElementById('menuOverlay').classList.remove('open');
+  }
+  window.openMenu = openMenu;
+  window.closeMenu = closeMenu;
+  // ---------- Navegación entre las secciones ----------
+  const VIEW_INFO = {
+    home: { title: 'Inicio', subtitle: 'Panel general y estadísticas' },
+    online: { title: 'Usuarios en línea', subtitle: 'Dispositivos conectados agrupados por servidor o combo' },
+    create: { title: 'Crear cliente', subtitle: 'Genera un código de acceso para un cliente' },
+    active: { title: 'Clientes activos', subtitle: 'Códigos que están funcionando ahora mismo' },
+    expiring: { title: 'Clientes por vencer', subtitle: 'Vencen dentro de los próximos 7 días' },
+    expired: { title: 'Clientes vencidos', subtitle: 'La fecha de vencimiento ya pasó' },
+    demos: { title: 'Demos', subtitle: 'Cuentas marcadas como demo' },
+    servers: { title: 'Servidores', subtitle: 'Servidores Xtream guardados por nombre' },
+    subadmins: { title: 'Paneles sub administrador', subtitle: 'Dar acceso a este panel a otra persona' },
+    whatsapp: { title: 'WhatsApp Automático', subtitle: 'Plantillas y recordatorios para vencimiento en 3 días' },
+    nexocontrol: { title: 'Control Remoto Nexo TV', subtitle: 'Configuración en vivo de la App y televisores en tiempo real' },
+    notifications: { title: 'Notificaciones', subtitle: 'Avisos y gestión masiva para clientes que vencen hoy' }
+  };
+  let currentView = 'home';
+  function selectView(name) {
+    currentView = name;
+    document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
+    
+    // Mostrar estadísticas SOLO en la pantalla de inicio (home)
+    const statsGrid = document.getElementById('statsGrid');
+    if (statsGrid) {
+      statsGrid.style.display = (name === 'home') ? 'grid' : 'none';
+    }
+    const homeChartCard = document.getElementById('homeChartCard');
+    if (homeChartCard) {
+      homeChartCard.style.display = (name === 'home') ? 'block' : 'none';
     }
 
-    function addFallback() {
-      if (!configData.servers.fallbacks) configData.servers.fallbacks = [];
-      configData.servers.fallbacks.push('');
-      renderFallbacks();
+    if (name === 'home') {
+      renderGrowthChart();
+    } else if (name === 'online') {
+      document.getElementById('view-online').style.display = 'block';
+      renderOnlineUsers();
+    } else if (name === 'create') {
+      document.getElementById('view-create').style.display = 'block';
+    } else if (name === 'whatsapp') {
+      document.getElementById('view-whatsapp').style.display = 'block';
+      loadWhatsappConfig();
+      renderWhatsappExpiringTable();
+    } else if (name === 'nexocontrol') {
+      document.getElementById('view-nexocontrol').style.display = 'block';
+      loadNexoRemoteConfig();
+    } else if (name === 'notifications') {
+      document.getElementById('view-notifications').style.display = 'block';
+      renderNotificationsView();
+    } else if (name === 'subadmins') {
+      document.getElementById('view-subadmins').style.display = 'block';
+      document.getElementById('view-subadmins-list').style.display = 'block';
+      loadSubadmins();
+    } else if (name === 'servers') {
+      document.getElementById('view-servers').style.display = 'block';
+      document.getElementById('view-servers-combo').style.display = 'block';
+      renderServersTable();
+      renderCombosTable();
+    } else {
+      document.getElementById('view-table').style.display = 'block';
+      document.getElementById('tableCardTitle').textContent = VIEW_INFO[name].title;
+      renderCodes();
+    }
+    document.getElementById('viewTitle').textContent = VIEW_INFO[name].title;
+    document.getElementById('viewSubtitle').textContent = VIEW_INFO[name].subtitle;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('nav-' + name).classList.add('active');
+    closeMenu();
+  }
+  window.selectView = selectView;
+  // ---------- Formatear una fecha de Firestore de forma legible ----------
+  function formatDate(timestamp) {
+    if (!timestamp || !timestamp.toDate) return '-';
+    const d = timestamp.toDate();
+    return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+      ' ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+  }
+  // ---------- Formatear solo la fecha (sin hora), para el vencimiento ----------
+  function formatDateOnly(dateStr) {
+    if (!dateStr) return '<span style="color:var(--muted)">Sin vencimiento</span>';
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+  // ---------- Generar un codigo nuevo (6 digitos numericos) ----------
+  function generateRandomCode() {
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += Math.floor(Math.random() * 10);
+    }
+    return code;
+  }
+  document.getElementById('generateBtn').addEventListener('click', async () => {
+    const clientName = document.getElementById('clientName').value.trim();
+    if (!clientName) {
+      alert('El nombre del cliente es obligatorio.');
+      return;
+    }
+    const clientPhoneRaw = document.getElementById('clientPhone').value.trim();
+    const sendWhatsapp = document.getElementById('sendWhatsapp').checked;
+    if (sendWhatsapp && !clientPhoneRaw) {
+      alert('Escribe el teléfono del cliente (con código de país), o desmarca la opción de enviar por WhatsApp.');
+      return;
+    }
+    // Para un sub administrador se usa directo lo que tiene asignado, sin depender de que
+    // el <select> (que ni siquiera ve) tenga el valor bien puesto.
+    const selectedValue = currentUserRole === 'subadmin'
+      ? (currentAssignedServerId || '')
+      : document.getElementById('serverSelect').value;
+    if (!selectedValue) {
+      alert('Selecciona un servidor, lista o combo de la lista.');
+      return;
+    }
+    // ---- Arma la(s) fuente(s) combinadas: 1 normalmente, 2 si se activó la casilla, o las 2 fijas de un combo ----
+    const sources = [];
+    function buildSource(server, usernameFieldId, passwordFieldId) {
+      if (server.type === 'm3u') {
+        return { type: 'm3u', serverId: server.id, m3uUrl: server.host };
+      }
+      const username = document.getElementById(usernameFieldId).value.trim();
+      const password = document.getElementById(passwordFieldId).value.trim();
+      if (!username || !password) return null;
+      return { type: 'xtream', serverId: server.id, host: server.host, username: username, password: password };
+    }
+    let selectedServer;
+    if (selectedValue.startsWith('combo::')) {
+      const comboId = selectedValue.substring('combo::'.length);
+      const combo = combosList.find(c => c.id === comboId);
+      const member1 = combo ? serversList.find(s => s.id === combo.memberIds[0]) : null;
+      const member2 = combo ? serversList.find(s => s.id === combo.memberIds[1]) : null;
+      if (!member1 || !member2) {
+        alert('No se pudo cargar este combo (puede que uno de sus servidores haya sido eliminado).');
+        return;
+      }
+      const source1 = buildSource(member1, 'username', 'xtreamPassword');
+      if (member1.type !== 'm3u' && !source1) {
+        alert('Completa usuario y contraseña del primer servidor del combo.');
+        return;
+      }
+      const source2 = buildSource(member2, 'username2', 'xtreamPassword2');
+      if (member2.type !== 'm3u' && !source2) {
+        alert('Completa usuario y contraseña del segundo servidor del combo.');
+        return;
+      }
+      sources.push(source1, source2);
+      selectedServer = member1; // para el nombre/mode que se guardan sueltos más abajo
+    } else {
+      selectedServer = serversList.find(s => s.host === selectedValue);
+      if (!selectedServer) {
+        alert('Selecciona un servidor o lista de la lista.');
+        return;
+      }
+      const source1 = buildSource(selectedServer, 'username', 'xtreamPassword');
+      if (selectedServer.type !== 'm3u' && !source1) {
+        alert('Completa usuario y contraseña.');
+        return;
+      }
+      sources.push(source1);
+      const useSecond = document.getElementById('useSecondSource').checked;
+      if (useSecond) {
+        const selectedHost2 = document.getElementById('serverSelect2').value;
+        const selectedServer2 = serversList.find(s => s.host === selectedHost2);
+        if (!selectedServer2) {
+          alert('Selecciona el segundo servidor o lista, o desmarca la casilla de combinar.');
+          return;
+        }
+        const source2 = buildSource(selectedServer2, 'username2', 'xtreamPassword2');
+        if (selectedServer2.type !== 'm3u' && !source2) {
+          alert('Completa usuario y contraseña del servidor adicional.');
+          return;
+        }
+        sources.push(source2);
+      }
+    }
+    const isDemo = document.getElementById('isDemo').checked;
+    const expirationDate = isDemo ? null : (document.getElementById('expirationDate').value || null);
+    // Nota: no hay ningún límite acá que impida crear un segundo código para el mismo
+    // cliente — si alguien quiere dos cuentas, ambos códigos quedan activos por separado,
+    // sin que uno afecte al otro.
+    const code = generateRandomCode();
+    const docData = {
+      active: true,
+      clientName: clientName,
+      clientPhone: clientPhoneRaw || null,
+      // Se guardan también sueltos (mode/host/username/password/m3uUrl) apuntando a la
+      // PRIMERA fuente, por compatibilidad con versiones viejas de la app.
+      mode: sources[0].type,
+      host: sources[0].host || null,
+      username: sources[0].username || null,
+      password: sources[0].password || null,
+      m3uUrl: sources[0].m3uUrl || null,
+      sources: sources,
+      deviceIds: [],
+      deviceActivity: {},
+      deviceNames: {},
+      expirationDate: expirationDate,
+      isDemo: isDemo,
+      allowTv: document.getElementById('allowTv').checked,
+      allowMovies: document.getElementById('allowMovies').checked,
+      allowSeries: document.getElementById('allowSeries').checked,
+      ownerId: auth.currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if (isDemo) {
+      const expires = new Date(Date.now() + demoHours * 60 * 60 * 1000);
+      docData.demoExpiresAt = firebase.firestore.Timestamp.fromDate(expires);
+    }
+    await db.collection('access_codes').doc(code).set(docData);
+
+    // ---- Abre WhatsApp con el mensaje del servicio ya armado, listo para enviar ----
+    if (sendWhatsapp && clientPhoneRaw) {
+      const phoneDigits = clientPhoneRaw.replace(/[^0-9]/g, '');
+      const mensaje = 'Estimado/a *' + clientName + '*, le damos una cordial bienvenida a *NEXO TV* 🌟.\n\nSu código de acceso exclusivo es: *' + code +
+        '*\n\nPor favor, descargue nuestra aplicación, ábrala e ingrese su código para comenzar a disfrutar de su servicio con total comodidad. 📱✨\n\n¡Agradecemos sinceramente su confianza y preferencia! 🙌';
+      const waUrl = 'https://wa.me/' + phoneDigits + '?text=' + encodeURIComponent(mensaje);
+      window.open(waUrl, '_blank');
     }
 
-    function removeFallback(idx) {
-      configData.servers.fallbacks.splice(idx, 1);
-      renderFallbacks();
+    document.getElementById('clientName').value = '';
+    document.getElementById('clientPhone').value = '';
+    // Cada cliente necesita SU PROPIO usuario y contraseña (no se repiten entre clientes) —
+    // esto se limpia siempre, sea administrador principal o sub administrador.
+    document.getElementById('username').value = '';
+    document.getElementById('xtreamPassword').value = '';
+    document.getElementById('username2').value = '';
+    document.getElementById('xtreamPassword2').value = '';
+    if (currentUserRole === 'subadmin') {
+      // El servidor/combo asignado se queda igual — el sub administrador no puede cambiarlo,
+      // así que no tiene sentido tocarlo acá.
+      onServerSelectChange();
+    } else {
+      document.getElementById('serverSelect').value = '';
+      onServerSelectChange();
+      document.getElementById('useSecondSource').checked = false;
+      onUseSecondSourceChange();
+      document.getElementById('serverSelect2').value = '';
     }
+    document.getElementById('expirationDate').value = '';
+    document.getElementById('isDemo').checked = false;
+    onDemoCheckChange();
+    setDemoHours(3);
+    showToast('Codigo generado: ' + code);
+  });
+  // ---------- Listar codigos en tiempo real + estadisticas ----------
+  let lastSnapshotDocs = [];
+  function listenToCodes() {
+    // El principal ve todos los códigos; un sub administrador solo ve los que él mismo creó.
+    let query = db.collection('access_codes');
+    if (currentUserRole !== 'admin') {
+      query = query.where('ownerId', '==', auth.currentUser.uid);
+    } else {
+      query = query.orderBy('createdAt', 'desc');
+    }
+    query.onSnapshot(snapshot => {
+        lastSnapshotDocs = [];
+        snapshot.forEach(doc => lastSnapshotDocs.push({ id: doc.id, data: doc.data() }));
+        if (currentUserRole !== 'admin') {
+          // Como esta consulta filtrada no puede además pedir orden por fecha sin un índice
+          // extra en Firestore, se ordena acá mismo del lado del panel.
+          lastSnapshotDocs.sort((a, b) => (b.data.createdAt?.seconds || 0) - (a.data.createdAt?.seconds || 0));
+        }
+        renderCodes();
+        if (currentView === 'online') {
+          renderOnlineUsers();
+        }
+      });
+    // Vuelve a dibujar cada 15 segundos SIN volver a consultar Firestore, solo para que el
+    // "en línea ahora" se vaya poniendo gris solo cuando pasan más de 2 minutos sin aviso.
+    setInterval(() => {
+      renderCodes();
+      if (currentView === 'online') {
+        renderOnlineUsers();
+      }
+    }, 15000);
+  }
+  /** Un dispositivo se considera "en línea ahora" si avisó actividad en los últimos 2 minutos */
+  function isDeviceOnline(timestamp) {
+    if (!timestamp) return false;
+    let timeMs = 0;
+    if (timestamp.toDate) {
+      timeMs = timestamp.toDate().getTime();
+    } else if (typeof timestamp === 'string') {
+      timeMs = new Date(timestamp).getTime();
+    } else if (timestamp.seconds) {
+      timeMs = timestamp.seconds * 1000;
+    }
+    if (!timeMs) return false;
+    return (Date.now() - timeMs) < 2 * 60 * 1000;
+  }
+  function countOnline(deviceActivity) {
+    if (!deviceActivity) return 0;
+    return Object.values(deviceActivity).filter(isDeviceOnline).length;
+  }
+  /** true si la fecha de vencimiento (string "YYYY-MM-DD") ya pasó */
+  function isExpired(expirationDate) {
+    if (!expirationDate) return false;
+    return new Date(expirationDate + 'T23:59:59') < new Date();
+  }
+  /** true si vence dentro de los próximos 7 días (y todavía no venció) */
+  function isExpiringSoon(expirationDate) {
+    if (!expirationDate) return false;
+    const diffDays = (new Date(expirationDate + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24);
+    return diffDays >= 0 && diffDays <= 7;
+  }
+  /** true si vence en menos de 24 horas (y todavía no venció) */
+  function isExpiringWithin24Hours(expirationDate) {
+    if (!expirationDate) return false;
+    const diffMs = new Date(expirationDate + 'T23:59:59') - new Date();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    return diffHours >= 0 && diffHours <= 24;
+  }
+  /** true si una demo ya pasó su hora exacta de vencimiento */
+  function isDemoExpired(demoExpiresAt) {
+    if (!demoExpiresAt || !demoExpiresAt.toDate) return false;
+    return demoExpiresAt.toDate() < new Date();
+  }
+  /** Texto legible de cuánto le queda (o hace cuánto venció) a una demo */
+  function demoTimeLabel(demoExpiresAt) {
+    if (!demoExpiresAt || !demoExpiresAt.toDate) return '-';
+    const diffMs = demoExpiresAt.toDate().getTime() - Date.now();
+    if (diffMs <= 0) return 'Demo vencida';
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return hours > 0 ? ('Quedan ' + hours + 'h ' + mins + 'm') : ('Quedan ' + mins + ' min');
+  }
+  function renderCodes() {
+    const tbody = document.getElementById('codesTableBody');
+    let totalCount = 0, activeCount = 0, revokedCount = 0, deviceTotal = 0, onlineTotal = 0;
+    let activeNav = 0, expiringNav = 0, expiredNav = 0, demosNav = 0, notificationsNav = 0;
+    lastSnapshotDocs.forEach(({ data }) => {
+      const active = data.active !== false;
+      const expired = isExpired(data.expirationDate);
+      const expiring = isExpiringSoon(data.expirationDate) && !expired;
+      const days = getDaysUntilExpiration(data.expirationDate);
 
-    function populateUI(data) {
-      if (!data) return;
-      configData = Object.assign({}, configData, data);
-      document.getElementById('primaryServer').value = configData.servers?.primary || '';
-      document.getElementById('backupServer').value = configData.servers?.backup || '';
-      renderFallbacks();
+      if (active && !data.isDemo && !expired && !expiring) activeNav++;
+      if (active && !data.isDemo && expiring) expiringNav++;
+      if (expired) expiredNav++;
+      if (data.isDemo) demosNav++;
+      if (!data.isDemo && days === 0) notificationsNav++;
+    });
+    document.getElementById('badge-active').textContent = activeNav;
+    document.getElementById('badge-expiring').textContent = expiringNav;
+    document.getElementById('badge-expired').textContent = expiredNav;
+    document.getElementById('badge-demos').textContent = demosNav;
+    document.getElementById('badge-notifications').textContent = notificationsNav;
+    document.getElementById('statActiveClients').textContent = activeNav;
+    document.getElementById('statExpiringClients').textContent = expiringNav;
+    document.getElementById('statExpiredClients').textContent = expiredNav;
+    document.getElementById('statDemos').textContent = demosNav;
+    if (currentView === 'notifications') {
+      renderNotificationsView();
+    }
+    if (currentView === 'home') {
+      renderGrowthChart();
+    }
+    const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+    const filtered = lastSnapshotDocs.filter(({ id: code, data }) => {
+      const active = data.active !== false;
+      const expired = isExpired(data.expirationDate);
+      const expiring = isExpiringSoon(data.expirationDate) && !expired;
 
-      document.getElementById('liveBuffer').value = configData.settings?.liveBufferMs || 350;
-      document.getElementById('autoReconnect').checked = configData.settings?.autoReconnect !== false;
-      document.getElementById('featuredChannelId').value = configData.settings?.featuredChannelId || '';
+      if (currentView === 'active') {
+        if (!active || data.isDemo || expired || expiring) return false;
+      }
+      if (currentView === 'expiring') {
+        if (!active || data.isDemo || !expiring) return false;
+      }
+      if (currentView === 'expired' && !expired) return false;
+      if (currentView === 'demos' && !data.isDemo) return false;
+      if (query && !(code + ' ' + (data.clientName || '')).toLowerCase().includes(query)) return false;
+      return true;
+    });
+    if (tbody) {
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No hay códigos en esta sección.</td></tr>';
+      } else {
+        tbody.innerHTML = '';
+        filtered.forEach(({ id: code, data }) => {
+          const active = data.active !== false;
+          const deviceCount = Array.isArray(data.deviceIds) ? data.deviceIds.length : 0;
+          const onlineCount = countOnline(data.deviceActivity);
+          const expired = data.isDemo ? isDemoExpired(data.demoExpiresAt) : isExpired(data.expirationDate);
+          const expiringSoon = !data.isDemo && isExpiringSoon(data.expirationDate);
+          let daysBadge = '';
+          if (expiringSoon && !data.isDemo) {
+            const now = new Date();
+            const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const expDate = new Date(data.expirationDate + 'T00:00:00');
+            const diffDays = Math.round((expDate - todayZero) / (1000 * 60 * 60 * 24));
+            let label = '';
+            if (diffDays <= 0) {
+              label = 'Hoy';
+            } else if (diffDays === 1) {
+              label = '1 día restante';
+            } else {
+              label = diffDays + ' días restantes';
+            }
+            daysBadge = ' <span style="background:rgba(255,122,46,0.18); color:var(--orange); padding:3px 8px; border-radius:4px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px; margin-left:6px;">' + label + '</span>';
+          }
+          let credText = '';
+          if (data.mode === 'm3u') {
+            credText = 'M3U: ' + (data.m3uUrl || '(sin cargar)');
+          } else {
+            credText = 'Host: ' + (data.host || '(sin cargar)') +
+              ' | Usuario: ' + (data.username || '-') +
+              ' | Clave: ' + (data.password || '-');
+          }
+          const deviceIds = Array.isArray(data.deviceIds) ? data.deviceIds : [];
+          const deviceNames = data.deviceNames || {};
+          const devicesListHtml = deviceIds.length === 0
+            ? '<div style="color:var(--muted); font-size:12px; padding:4px 0;">Sin dispositivos registrados todavía</div>'
+            : deviceIds.map(id => {
+                const safeId = id.replace(/</g, '&lt;');
+                const name = deviceNames[id] ? deviceNames[id].replace(/</g, '&lt;') : null;
+                return '<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 0; border-bottom:1px solid var(--border);">' +
+                  '<span style="font-size:12px; word-break:break-all;">' +
+                    (name ? '<div style="font-weight:600;">' + name + '</div>' : '') +
+                    '<div style="color:var(--muted); font-size:11px; font-family:ui-monospace,monospace;">' + safeId + '</div>' +
+                  '</span>' +
+                  '<button class="danger" style="padding:4px 9px; font-size:11px; flex-shrink:0;" onclick="removeDevice(\'' + code + '\', \'' + id.replace(/'/g, "\\'") + '\')">Quitar</button>' +
+                '</div>';
+              }).join('');
+          const onlineBadge = onlineCount > 0
+            ? '<div class="online-badge"><span class="live-dot"></span>' + onlineCount + ' en línea</div>'
+            : '';
+          const demoBadge = data.isDemo ? ' <span class="badge" style="background:rgba(79,141,253,0.15);color:var(--blue);">Demo</span>' : '';
+          const expireColor = expired ? 'var(--red)' : (expiringSoon ? 'var(--orange)' : 'var(--muted)');
+          const expireText = (data.isDemo ? demoTimeLabel(data.demoExpiresAt) : formatDateOnly(data.expirationDate)) + daysBadge;
+          const upgradeBox = '<div class="credentials-box upgrade-box">' +
+            '<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">Actualizar plan o renovar:</div>' +
+            '<div style="display:flex; flex-wrap:wrap; gap:6px;">' +
+              '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 1)">1 mes</button>' +
+              '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 3)">3 meses</button>' +
+              '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 6)">6 meses</button>' +
+              '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 12)">1 año</button>' +
+            '</div>' +
+          '</div>';
+          const whatsappBtn = data.clientPhone
+            ? '<button class="secondary" onclick="resendWhatsapp(\'' + code + '\', ' + JSON.stringify(data.clientName || '').replace(/"/g, '&quot;') + ', ' + JSON.stringify(data.clientPhone).replace(/"/g, '&quot;') + ')">Reenviar WhatsApp</button>'
+            : '';
+          const tr = document.createElement('tr');
+          tr.innerHTML =
+            '<td class="code-cell">' + code + '</td>' +
+            '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + demoBadge + '</td>' +
+            '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span><div class="device-count">' + deviceCount + '/3 disp.</div>' + onlineBadge + '</td>' +
+            '<td style="color:' + expireColor + '; font-size:12px; font-weight:' + (expired || expiringSoon ? '700' : '400') + ';">' + expireText + '</td>' +
+            '<td class="actions-cell">' +
+              '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
+              whatsappBtn +
+              '<button class="secondary" onclick="openEditClientModal(\'' + code + '\')">Editar cliente</button>' +
+              '<button class="secondary" onclick="toggleCreds(this, \'.devices-box\')">Dispositivos (' + deviceCount + ')</button>' +
+              '<button class="secondary" onclick="toggleCreds(this, \'.upgrade-box\')">Actualizar plan</button>' +
+              '<button class="' + (active ? 'danger' : 'secondary') + '" onclick="toggleActive(\'' + code + '\', ' + active + ')">' + (active ? 'Revocar' : 'Reactivar') + '</button>' +
+              '<button class="danger" onclick="deleteCode(\'' + code + '\')">Eliminar</button>' +
+              '<div class="credentials-box devices-box">' + devicesListHtml + '</div>' +
+              upgradeBox +
+            '</td>';
+          tbody.appendChild(tr);
+        });
+      }
+    }
+    // Las estadísticas de arriba siempre reflejan TODOS los códigos, sin importar la sección
+    lastSnapshotDocs.forEach(({ data }) => {
+      totalCount++;
+      if (data.active !== false) activeCount++; else revokedCount++;
+      deviceTotal += Array.isArray(data.deviceIds) ? data.deviceIds.length : 0;
+      onlineTotal += countOnline(data.deviceActivity);
+    });
+    updateStats(totalCount, activeCount, revokedCount, deviceTotal, onlineTotal);
+  }
+  function updateStats(total, active, revoked, devices, online) {
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statActive').textContent = active;
+    document.getElementById('statRevoked').textContent = revoked;
+    document.getElementById('statDevices').textContent = devices;
+    document.getElementById('statOnline').textContent = online;
+  }
 
-      document.getElementById('announcementEnabled').checked = !!configData.announcement?.enabled;
-      document.getElementById('announcementTitle').value = configData.announcement?.title || '';
-      document.getElementById('announcementMsg').value = configData.announcement?.message || '';
+  function renderOnlineUsers() {
+    const container = document.getElementById('view-online-content');
+    if (!container) return;
+    container.innerHTML = '';
+    const onlineByGroup = {};
+    lastSnapshotDocs.forEach(({ id: code, data }) => {
+      const onlineCount = countOnline(data.deviceActivity);
+      if (onlineCount > 0) {
+        let groupName = 'Desconocido';
+        if (Array.isArray(data.sources) && data.sources.length > 0) {
+          const serverNames = data.sources.map(src => {
+            const s = serversList.find(x => x.id === src.serverId);
+            return s ? s.name : (src.host || 'Servidor');
+          });
+          if (data.sources.length === 2) {
+             const matchingCombo = combosList.find(c => c.memberIds.includes(data.sources[0].serverId) && c.memberIds.includes(data.sources[1].serverId));
+             groupName = matchingCombo ? matchingCombo.name : serverNames.join(' + ');
+          } else {
+             groupName = serverNames.join(' + ');
+          }
+        } else if (data.host) {
+          const s = serversList.find(x => x.host === data.host);
+          groupName = s ? s.name : data.host;
+        }
+        if (!onlineByGroup[groupName]) onlineByGroup[groupName] = [];
+        onlineByGroup[groupName].push({ code, data, onlineCount });
+      }
+    });
+    if (Object.keys(onlineByGroup).length === 0) {
+      container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--muted); background:var(--surface); border-radius:12px;">No hay ningún dispositivo conectado en este momento.</div>';
+      return;
+    }
+    for (const groupName in onlineByGroup) {
+      const users = onlineByGroup[groupName];
+      const groupOnlineCount = users.reduce((sum, u) => sum + u.onlineCount, 0);
+      const section = document.createElement('div');
+      section.style.marginBottom = '20px';
+      section.innerHTML = '<h3 style="color:var(--text); margin-bottom:10px; padding:10px 14px; background:var(--surface); border-radius:8px; display:flex; justify-content:space-between; font-size:15px; align-items:center;">' +
+        '<span>' + groupName + '</span>' +
+        '<span class="nav-badge" style="background:rgba(255,122,46,0.1); color:var(--orange); position:static; transform:none; font-size:11px;">' + groupOnlineCount + ' en línea</span></h3>' +
+        '<table class="table" style="margin-top:0;">' +
+          '<thead><tr><th>CLIENTE</th><th>CÓDIGO</th><th>DISPOSITIVOS CONECTADOS</th></tr></thead>' +
+          '<tbody>' + users.map(u => {
+            let devicesHtml = '';
+            if (u.data.deviceActivity) {
+              Object.keys(u.data.deviceActivity).forEach(deviceId => {
+                if (isDeviceOnline(u.data.deviceActivity[deviceId])) {
+                  const deviceName = (u.data.deviceNames && u.data.deviceNames[deviceId]) ? u.data.deviceNames[deviceId] : deviceId;
+                  devicesHtml += '<div style="font-size:12px; color:var(--muted); padding:4px 0;">' +
+                    '<span class="live-dot" style="margin-right:6px;"></span>' + deviceName.replace(/</g, '&lt;') + '</div>';
+                }
+              });
+            }
+            return '<tr>' +
+              '<td><div style="font-weight:500;">' + (u.data.clientName || '-') + '</div><div style="font-size:12px; color:var(--muted);">' + (u.data.clientPhone || '') + '</div></td>' +
+              '<td style="font-family:ui-monospace,monospace; font-size:13px;">' + u.code + '</td>' +
+              '<td>' + devicesHtml + '</td>' +
+            '</tr>';
+          }).join('') + '</tbody></table>';
+      container.appendChild(section);
+    }
+  }
+  window.toggleCreds = (btn, selector) => {
+    const box = btn.closest('td').querySelector(selector || '.credentials-box');
+    box.style.display = box.style.display === 'block' ? 'none' : 'block';
+  };
+  window.toggleActive = async (code, currentlyActive) => {
+    await db.collection('access_codes').doc(code).update({ active: !currentlyActive });
+  };
+  window.resendWhatsapp = (code, clientName, clientPhone) => {
+    const phoneDigits = String(clientPhone).replace(/[^0-9]/g, '');
+    const mensaje = 'Estimado/a *' + clientName + '*, le compartimos los datos de su servicio en *JetGo* 📌.\n\nSu código de acceso es: *' + code +
+      '*\n\n📥 Descargue la aplicación, ábrala e ingrese su código para continuar disfrutando del mejor entretenimiento. 🎬✨\n\n¡Muchas gracias por confiar en nosotros! 🙌';
+    const waUrl = 'https://wa.me/' + phoneDigits + '?text=' + encodeURIComponent(mensaje);
+    window.open(waUrl, '_blank');
+  };
+  // Quita SOLO un dispositivo puntual de la lista (por su id), dejando el resto intactos.
+  window.removeDevice = async (code, deviceId) => {
+    if (!confirm('¿Quitar este dispositivo del código ' + code + '? Va a dejar de tener acceso hasta que vuelva a ingresar el código.')) return;
+    const docRef = db.collection('access_codes').doc(code);
+    const snap = await docRef.get();
+    const current = Array.isArray(snap.data()?.deviceIds) ? snap.data().deviceIds : [];
+    const updated = current.filter(id => id !== deviceId);
+    const updates = { deviceIds: updated };
+    updates['deviceNames.' + deviceId] = firebase.firestore.FieldValue.delete();
+    updates['deviceActivity.' + deviceId] = firebase.firestore.FieldValue.delete();
+    await docRef.update(updates);
+    showToast('Dispositivo quitado');
+  };
+  // Convierte una cuenta demo en un plan pago: deja de ser demo y le pone la fecha de
+  // vencimiento correspondiente (hoy + los meses elegidos), quedando activa como cliente normal.
+  window.upgradeToPlan = async (code, months) => {
+    const labels = { 1: '1 mes', 3: '3 meses', 6: '6 meses', 12: '1 año' };
+    if (!confirm('¿Extender o activar el plan de ' + labels[months] + ' para el código ' + code + '?')) return;
+    try {
+      const docRef = db.collection('access_codes').doc(code);
+      const snap = await docRef.get();
+      const data = snap.data() || {};
+      let baseDate = new Date();
+      if (!data.isDemo && data.expirationDate) {
+        const exp = new Date(data.expirationDate + 'T00:00:00');
+        if (!isNaN(exp) && exp > baseDate) baseDate = exp;
+      }
+      baseDate.setMonth(baseDate.getMonth() + months);
+      const expirationDate = baseDate.toISOString().slice(0, 10);
+      const updates = {
+        isDemo: false,
+        expirationDate: expirationDate,
+        active: true,
+        forceCloseSignal: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if (data.demoExpiresAt !== undefined) {
+        updates.demoExpiresAt = firebase.firestore.FieldValue.delete();
+      }
+      await docRef.update(updates);
+      showToast('Plan de ' + labels[months] + ' aplicado');
+    } catch (e) {
+      console.error(e);
+      alert('Error al actualizar el plan: ' + e.message);
+    }
+  };
+  window.deleteCode = async (code) => {
+    if (!confirm('Eliminar el codigo ' + code + '? Esta accion no se puede deshacer.')) return;
+    await db.collection('access_codes').doc(code).delete();
+  };
+  window.copyCode = (code) => {
+    navigator.clipboard.writeText(code);
+    showToast('Codigo copiado');
+  };
+  // ---------- Crear sub administrador (solo el principal ve este botón) ----------
+  document.getElementById('createSubadminBtn').addEventListener('click', async () => {
+    const username = document.getElementById('subadminUsername').value.trim().toLowerCase().replace(/\s+/g, '');
+    const password = document.getElementById('subadminPassword').value;
+    const assignedServerId = document.getElementById('subadminServerSelect').value;
+    const errEl = document.getElementById('subadminError');
+    errEl.textContent = '';
+    if (!username || !password || password.length < 6) {
+      errEl.textContent = 'Completa un usuario y una contraseña de al menos 6 caracteres.';
+      return;
+    }
+    if (!assignedServerId) {
+      errEl.textContent = 'Elige qué servidor/lista va a poder usar este sub administrador.';
+      return;
+    }
+    const syntheticEmail = username + SUBADMIN_EMAIL_DOMAIN;
+    // Se usa una app secundaria de Firebase SOLO para crear la cuenta, así no se cierra
+    // tu sesión de administrador principal (crear un usuario con el SDK normalmente
+    // inicia sesión como ese usuario nuevo, que es justo lo que queremos evitar acá).
+    let secondaryApp;
+    try {
+      secondaryApp = firebase.initializeApp(firebaseConfig, 'SubadminCreation_' + Date.now());
+      const cred = await secondaryApp.auth().createUserWithEmailAndPassword(syntheticEmail, password);
+      const newUid = cred.user.uid;
+      await secondaryApp.auth().signOut();
+      await db.collection('admins').doc(newUid).set({
+        username: username,
+        email: syntheticEmail,
+        role: 'subadmin',
+        revoked: false,
+        assignedServerId: assignedServerId,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      document.getElementById('subadminUsername').value = '';
+      document.getElementById('subadminPassword').value = '';
+      document.getElementById('subadminServerSelect').value = '';
+      showToast('Sub administrador creado');
+      loadSubadmins();
+    } catch (e) {
+      let msg = e.message;
+      if (e.code === 'auth/email-already-in-use') msg = 'Ese usuario ya existe.';
+      if (e.code === 'auth/weak-password') msg = 'La contraseña es muy débil (mínimo 6 caracteres).';
+      errEl.textContent = msg;
+    } finally {
+      if (secondaryApp) await secondaryApp.delete();
+    }
+  });
+  // ---------- Listar sub administradores existentes ----------
+  async function loadSubadmins() {
+    const tbody = document.getElementById('subadminsTableBody');
+    try {
+      const snapshot = await db.collection('admins').orderBy('createdAt', 'desc').get();
+      if (snapshot.empty) {
+        tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">Todavía no hay sub administradores.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const revoked = data.revoked === true;
+        const createdText = formatDate(data.createdAt);
+        const isComboAssigned = (data.assignedServerId || '').startsWith('combo::');
+        const assignedComboId = isComboAssigned ? data.assignedServerId.substring('combo::'.length) : null;
+        const assignedServer = isComboAssigned
+          ? combosList.find(c => c.id === assignedComboId)
+          : serversList.find(s => s.id === data.assignedServerId);
+        const assignedName = assignedServer ? assignedServer.name + (isComboAssigned ? ' (Combo)' : '') : null;
+        const tr = document.createElement('tr');
+        const serverOptionsHtml = serversList.map(s => '<option value="' + s.id + '"' + (s.id === data.assignedServerId ? ' selected' : '') + '>' + s.name.replace(/</g, '&lt;') + '</option>').join('');
+        const comboOptionsHtml = combosList.length === 0 ? '' :
+          '<optgroup label="Combos">' +
+            combosList.map(c => '<option value="combo::' + c.id + '"' + (('combo::' + c.id) === data.assignedServerId ? ' selected' : '') + '>' + c.name.replace(/</g, '&lt;') + '</option>').join('') +
+          '</optgroup>';
+        const serverCellHtml = currentUserRole === 'admin'
+          ? '<select onchange="changeSubadminServer(\'' + doc.id + '\', this.value)" style="padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:12px;">' +
+              '<option value="">Sin asignar</option>' +
+              serverOptionsHtml + comboOptionsHtml +
+            '</select>'
+          : (assignedName || 'Sin asignar');
+        tr.innerHTML =
+          '<td>' + (data.username || data.email) + (revoked ? ' <span class="badge revoked">Revocado</span>' : ' <span class="badge active">Activo</span>') + '</td>' +
+          '<td style="color:var(--muted); font-size:12px;">' + createdText + '</td>' +
+          '<td>' + serverCellHtml + '</td>' +
+          '<td class="actions-cell">' +
+            (currentUserRole === 'admin'
+              ? '<button class="' + (revoked ? 'secondary' : 'danger') + '" onclick="toggleSubadminRevoked(\'' + doc.id + '\', ' + revoked + ')">' + (revoked ? 'Reactivar' : 'Revocar acceso') + '</button>'
+              : '<span style="color:var(--muted); font-size:12px;">Solo el principal puede editar</span>') +
+          '</td>';
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="4" style="color:var(--red)">No se pudo cargar la lista.</td></tr>';
+    }
+  }
+  window.toggleSubadminRevoked = async (uid, currentlyRevoked) => {
+    await db.collection('admins').doc(uid).update({ revoked: !currentlyRevoked });
+    showToast(currentlyRevoked ? 'Acceso reactivado' : 'Acceso revocado');
+    loadSubadmins();
+  };
+  window.changeSubadminServer = async (uid, newServerId) => {
+    await db.collection('admins').doc(uid).update({ assignedServerId: newServerId || null });
+    showToast(newServerId ? 'Servidor asignado actualizado' : 'Servidor quitado');
+  };
+  // ---------- Servidores Xtream guardados por nombre ----------
+  let serversList = [];
+  async function loadServers() {
+    try {
+      const snapshot = await db.collection('servers').orderBy('name').get();
+      serversList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (e) {
+      serversList = [];
+    }
+    renderServerDropdown();
+    renderComboServerDropdowns();
+    renderSubadminServerDropdown();
+  }
+  function renderSubadminServerDropdown() {
+    const select = document.getElementById('subadminServerSelect');
+    if (!select) return;
+    const currentValue = select.value;
+    const serverOptions = serversList.map(s => '<option value="' + s.id + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
+    const comboOptions = combosList.length === 0 ? '' :
+      '<optgroup label="Combos">' +
+        combosList.map(c => '<option value="combo::' + c.id + '">' + c.name.replace(/</g, '&lt;') + ' (Combo)</option>').join('') +
+      '</optgroup>';
+    select.innerHTML = '<option value="">Selecciona uno...</option>' + serverOptions + comboOptions;
+    select.value = currentValue;
+  }
+  function renderServerDropdown() {
+    // Un sub administrador solo puede ver/usar el servidor (o combo) que le asignó el
+    // principal — ni el resto de la lista, ni otros combos.
+    const visibleServers = currentUserRole === 'subadmin'
+      ? serversList.filter(s => s.id === currentAssignedServerId)
+      : serversList;
+    const visibleCombos = currentUserRole === 'subadmin'
+      ? combosList.filter(c => ('combo::' + c.id) === currentAssignedServerId)
+      : combosList;
+    const optionsHtml = '<option value="">Selecciona uno...</option>' +
+      visibleServers.map(s => '<option value="' + s.host.replace(/"/g, '&quot;') + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
+    const comboOptionsHtml = visibleCombos.length === 0 ? '' :
+      '<optgroup label="Combos">' +
+        visibleCombos.map(c => '<option value="combo::' + c.id + '">' + c.name.replace(/</g, '&lt;') + ' (Combo)</option>').join('') +
+      '</optgroup>';
+    const select = document.getElementById('serverSelect');
+    const currentValue = select.value;
+    select.innerHTML = optionsHtml + comboOptionsHtml;
+    select.value = currentValue;
+    // Al sub administrador se le deja su servidor (o combo) ya elegido de entrada — no tiene
+    // sentido pedirle que "elija" ni mostrarle nada del servidor si solo puede usar uno.
+    const serverSelectRow = document.getElementById('serverSelectRow');
+    if (currentUserRole === 'subadmin') {
+      if (serverSelectRow) serverSelectRow.style.display = 'none';
+      if (!currentValue) {
+        if (visibleServers.length === 1) {
+          select.value = visibleServers[0].host;
+        } else if (visibleCombos.length === 1) {
+          select.value = 'combo::' + visibleCombos[0].id;
+        }
+      }
+    } else if (serverSelectRow) {
+      serverSelectRow.style.display = 'block';
+    }
+    onServerSelectChange();
+    const select2 = document.getElementById('serverSelect2');
+    if (select2) {
+      const currentValue2 = select2.value;
+      select2.innerHTML = optionsHtml;
+      select2.value = currentValue2;
+      onServerSelect2Change();
+    }
+  }
+  function onUseSecondSourceChange() {
+    document.getElementById('secondSourceBox').style.display = document.getElementById('useSecondSource').checked ? 'block' : 'none';
+  }
+  window.onUseSecondSourceChange = onUseSecondSourceChange;
+  function onServerSelect2Change() {
+    const select2 = document.getElementById('serverSelect2');
+    const selected = serversList.find(s => s.host === select2.value);
+    const isXtream = selected ? selected.type !== 'm3u' : false;
+    document.getElementById('xtreamCredFields2').style.display = isXtream ? 'block' : 'none';
+  }
+  window.onServerSelect2Change = onServerSelect2Change;
+  function renderServersTable() {
+    const tbody = document.getElementById('serversTableBody');
+    if (serversList.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Todavía no hay servidores ni listas guardadas.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = '';
+    serversList.forEach(s => {
+      const tr = document.createElement('tr');
+      const urlCell = currentUserRole === 'admin'
+        ? '<td style="font-family:ui-monospace,monospace; font-size:12px; word-break:break-all;">' + s.host + '</td>'
+        : '';
+      const hiddenCount = Array.isArray(s.hiddenCategories) ? s.hiddenCategories.length : 0;
+      const hiddenTypes = Array.isArray(s.hiddenTypes) ? s.hiddenTypes : [];
+      const hiddenCategoriesBox = currentUserRole === 'admin' ? (
+        '<div class="credentials-box hidden-cats-box">' +
+          '<div style="font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">Ocultar secciones completas:</div>' +
+          '<div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">' +
+            '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;"><input type="checkbox" id="editHideLive_' + s.id + '" style="width:auto; margin:0;" ' + (hiddenTypes.includes('live') ? 'checked' : '') + ' /> Ocultar TV Vivo</label>' +
+            '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;"><input type="checkbox" id="editHideMovie_' + s.id + '" style="width:auto; margin:0;" ' + (hiddenTypes.includes('movie') ? 'checked' : '') + ' /> Ocultar Películas</label>' +
+            '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;"><input type="checkbox" id="editHideSeries_' + s.id + '" style="width:auto; margin:0;" ' + (hiddenTypes.includes('series') ? 'checked' : '') + ' /> Ocultar Series</label>' +
+          '</div>' +
+          '<div style="font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">Seleccionar y ocultar categorías del servidor (haz clic en una para ocultarla al instante):</div>' +
+          (s.type !== 'm3u' ? '<div style="display:flex; gap:6px; margin-bottom:8px;"><input id="testUser_' + s.id + '" type="text" placeholder="Usuario (opcional)" style="margin-bottom:0; font-size:12px; padding:8px;" /><input id="testPass_' + s.id + '" type="text" placeholder="Contraseña (opcional)" style="margin-bottom:0; font-size:12px; padding:8px;" /></div>' : '') +
+          '<button class="secondary full" style="padding:8px; margin-bottom:8px; font-size:12px;" onclick="loadServerCategories(\'' + s.id + '\')">📂 Cargar categorías del servidor</button>' +
+          '<div id="categoriesContainer_' + s.id + '" style="margin-bottom:8px;"></div>' +
+          '<div style="font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">Categorías ocultas (una por línea):</div>' +
+          '<textarea id="hiddenCatsInput_' + s.id + '" rows="3" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:13px; margin-bottom:8px;">' + (s.hiddenCategories || []).join('\n') + '</textarea>' +
+          '<button class="secondary full" style="padding:9px;" onclick="saveHiddenCategories(\'' + s.id + '\')">Guardar cambios</button>' +
+        '</div>'
+      ) : '';
+      tr.innerHTML =
+        '<td>' + s.name + '</td>' +
+        '<td>' + (s.type === 'm3u' ? 'Lista M3U' : 'Xtream Codes') + '</td>' +
+        urlCell +
+        '<td class="actions-cell">' +
+          (currentUserRole === 'admin'
+            ? '<button class="secondary" onclick="toggleCreds(this, \'.hidden-cats-box\')">Ocultar contenido</button>' +
+              '<button class="danger" onclick="deleteServer(\'' + s.id + '\')">Eliminar</button>' +
+              hiddenCategoriesBox
+            : '<span style="color:var(--muted); font-size:12px;">Solo el principal puede editar</span>') +
+        '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+  function normalizeCatName(s) {
+    if (!s) return '';
+    return s.replace(/\uFE0F/g, '').replace(/\uFE0E/g, '').trim().toLowerCase();
+  }
 
-      document.getElementById('maintenanceEnabled').checked = !!configData.maintenance?.enabled;
-      document.getElementById('maintenanceTitle').value = configData.maintenance?.title || '';
-      document.getElementById('maintenanceMsg').value = configData.maintenance?.message || '';
+  window.loadServerCategories = async (serverId) => {
+    const server = serversList.find(s => s.id === serverId);
+    if (!server) return;
+    const container = document.getElementById('categoriesContainer_' + serverId);
+    container.innerHTML = '<div style="color:var(--muted); font-size:13px; padding:6px;">Cargando categorías del servidor...</div>';
 
-      if (configData.updatedAt) {
-        document.getElementById('lastUpdateLabel').innerText = 'Actualizado: ' + new Date(configData.updatedAt).toLocaleTimeString();
+    let username = document.getElementById('testUser_' + serverId)?.value?.trim() || '';
+    let password = document.getElementById('testPass_' + serverId)?.value?.trim() || '';
+
+    if (server.type !== 'm3u' && (!username || !password)) {
+      const clientWithServer = lastSnapshotDocs.find(d => {
+        const data = d.data;
+        return data.sources && data.sources.some(src => src.serverId === serverId && src.username && src.password);
+      });
+      if (clientWithServer) {
+        const src = clientWithServer.data.sources.find(src => src.serverId === serverId);
+        username = src.username;
+        password = src.password;
+      } else {
+        username = prompt('Ingresa un usuario de prueba para este servidor Xtream:') || '';
+        password = prompt('Ingresa la contraseña:') || '';
+      }
+      if (!username || !password) {
+        container.innerHTML = '<div style="color:var(--red); font-size:13px; padding:6px;">Se requieren usuario y contraseña para cargar las categorías.</div>';
+        return;
       }
     }
 
-    async function loadFromFirebase() {
-      try {
-        const res = await fetch(FIREBASE_URL + '?t=' + Date.now());
-        if (res.ok) {
-          const data = await res.json();
-          if (data) {
-            populateUI(data);
-            showToast('⚡ Datos sincronizados desde Firebase.');
+    try {
+      let rawCats = [];
+      if (server.type === 'm3u') {
+        const res = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(server.host));
+        const text = await res.text();
+        const matches = text.matchAll(/group-title="([^"]+)"/g);
+        const set = new Set();
+        for (const m of matches) {
+          if (m[1]) set.add(m[1].trim());
+        }
+        rawCats = Array.from(set).map(name => ({ name: name }));
+      } else {
+        const base = server.host.endsWith('/') ? server.host.slice(0, -1) : server.host;
+        const actions = ['get_live_categories', 'get_vod_categories', 'get_series_categories'];
+        for (const action of actions) {
+          const url = `${base}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=${action}`;
+          const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+          try {
+            const res = await fetch(proxyUrl);
+            const data = await res.json();
+            if (Array.isArray(data)) {
+              data.forEach(item => {
+                const name = item.category_name || item.name;
+                if (name && !rawCats.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+                  rawCats.push({ name: name.trim() });
+                }
+              });
+            }
+          } catch (e) {
+            // ignore
           }
         }
-      } catch (e) {
-        console.error('Error cargando Firebase:', e);
       }
+
+      if (rawCats.length === 0) {
+        container.innerHTML = '<div style="color:var(--muted); font-size:13px; padding:6px;">No se encontraron categorías.</div>';
+        return;
+      }
+
+      let html = '<div style="font-size:11px; color:var(--muted); margin-bottom:6px;">Haz clic en una categoría para ocultarla o mostrarla:</div>';
+      html += '<div style="display:flex; flex-wrap:wrap; gap:5px; max-height:180px; overflow-y:auto; padding:6px; background:var(--bg); border-radius:8px; border:1px solid var(--border);">';
+      
+      const hiddenSet = new Set((server.hiddenCategories || []).map(c => normalizeCatName(c)));
+
+      rawCats.sort((a, b) => a.name.localeCompare(b.name)).forEach(cat => {
+        const isHidden = hiddenSet.has(normalizeCatName(cat.name));
+        html += '<button type="button" onclick="toggleCategoryHidden(\'' + serverId + '\', \'' + cat.name.replace(/'/g, "\\'") + '\')" style="background:' + (isHidden ? 'var(--red-dim)' : 'var(--surface2)') + '; color:' + (isHidden ? 'var(--red)' : 'var(--text)') + '; border:1px solid ' + (isHidden ? 'var(--red)' : 'var(--border)') + '; padding:5px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:' + (isHidden ? '700' : '500') + ';">' + (isHidden ? '🔒 ' : '') + cat.name.replace(/</g, '&lt;') + '</button>';
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    } catch (e) {
+      container.innerHTML = '<div style="color:var(--red); font-size:13px; padding:6px;">Error al cargar: ' + e.message + '</div>';
+    }
+  };
+  window.toggleCategoryHidden = async (serverId, categoryName) => {
+    const server = serversList.find(s => s.id === serverId);
+    if (!server) return;
+    let currentHidden = [...(server.hiddenCategories || [])];
+    const idx = currentHidden.findIndex(c => normalizeCatName(c) === normalizeCatName(categoryName));
+    if (idx >= 0) {
+      currentHidden.splice(idx, 1);
+    } else {
+      currentHidden.push(categoryName);
+    }
+    await db.collection('servers').doc(serverId).update({ hiddenCategories: currentHidden });
+    server.hiddenCategories = currentHidden;
+    const textarea = document.getElementById('hiddenCatsInput_' + serverId);
+    if (textarea) {
+      textarea.value = currentHidden.join('\n');
+    }
+    showToast(idx >= 0 ? 'Categoría visible' : 'Categoría oculta');
+    loadServerCategories(serverId);
+  };
+  window.saveHiddenCategories = async (serverId) => {
+    const raw = document.getElementById('hiddenCatsInput_' + serverId).value;
+    const categories = raw.split('\n').map(c => c.trim()).filter(c => c.length > 0);
+    const hiddenTypes = [];
+    if (document.getElementById('editHideLive_' + serverId).checked) hiddenTypes.push('live');
+    if (document.getElementById('editHideMovie_' + serverId).checked) hiddenTypes.push('movie');
+    if (document.getElementById('editHideSeries_' + serverId).checked) hiddenTypes.push('series');
+    await db.collection('servers').doc(serverId).update({ hiddenCategories: categories, hiddenTypes: hiddenTypes });
+    showToast('Guardado');
+    await loadServers();
+    renderServersTable();
+  };
+  document.getElementById('createServerBtn').addEventListener('click', async () => {
+    const name = document.getElementById('serverName').value.trim();
+    const host = document.getElementById('serverHost').value.trim();
+    if (!name || !host) {
+      alert('Completa el nombre y la URL.');
+      return;
+    }
+    const hiddenTypes = [];
+    if (document.getElementById('hideTypeLive').checked) hiddenTypes.push('live');
+    if (document.getElementById('hideTypeMovie').checked) hiddenTypes.push('movie');
+    if (document.getElementById('hideTypeSeries').checked) hiddenTypes.push('series');
+    await db.collection('servers').add({
+      name: name,
+      host: host,
+      type: newServerType,
+      hiddenTypes: hiddenTypes,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('serverName').value = '';
+    document.getElementById('serverHost').value = '';
+    document.getElementById('hideTypeLive').checked = false;
+    document.getElementById('hideTypeMovie').checked = false;
+    document.getElementById('hideTypeSeries').checked = false;
+    showToast('Guardado');
+    await loadServers();
+    renderServersTable();
+  });
+  window.deleteServer = async (id) => {
+    if (!confirm('¿Eliminar este servidor? Los códigos que ya lo usan no se ven afectados, solo dejará de aparecer como opción para códigos nuevos.')) return;
+    await db.collection('servers').doc(id).delete();
+    await loadServers();
+    renderServersTable();
+  };
+  // ---------- Combos: 2 servidores/listas ya guardados, combinados con un nombre ----------
+  let combosList = [];
+  async function loadCombos() {
+    try {
+      const snapshot = await db.collection('combos').orderBy('name').get();
+      combosList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (e) {
+      combosList = [];
+    }
+    renderComboServerDropdowns();
+    renderServerDropdown(); // para que los combos aparezcan también en "Crear cliente nuevo"
+    renderSubadminServerDropdown();
+  }
+  function renderComboServerDropdowns() {
+    const optionsHtml = '<option value="">Selecciona uno...</option>' +
+      serversList.map(s => '<option value="' + s.id + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
+    const sel1 = document.getElementById('comboServer1');
+    const sel2 = document.getElementById('comboServer2');
+    if (sel1) { const v = sel1.value; sel1.innerHTML = optionsHtml; sel1.value = v; }
+    if (sel2) { const v = sel2.value; sel2.innerHTML = optionsHtml; sel2.value = v; }
+  }
+  function renderCombosTable() {
+    const tbody = document.getElementById('combosTableBody');
+    if (!tbody) return;
+    if (combosList.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">Todavía no hay combos guardados.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = '';
+    combosList.forEach(c => {
+      const memberNames = (c.memberIds || []).map(id => {
+        const s = serversList.find(x => x.id === id);
+        return s ? s.name : '(servidor eliminado)';
+      }).join(' + ');
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + c.name + '</td>' +
+        '<td style="color:var(--muted); font-size:12px;">' + memberNames + '</td>' +
+        '<td class="actions-cell">' +
+          (currentUserRole === 'admin'
+            ? '<button class="danger" onclick="deleteCombo(\'' + c.id + '\')">Eliminar</button>'
+            : '<span style="color:var(--muted); font-size:12px;">Solo el principal puede editar</span>') +
+        '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById('createComboBtn')?.addEventListener('click', async () => {
+    const name = document.getElementById('comboName').value.trim();
+    const id1 = document.getElementById('comboServer1').value;
+    const id2 = document.getElementById('comboServer2').value;
+    if (!name || !id1 || !id2) {
+      alert('Completa el nombre y los 2 servidores/listas a combinar.');
+      return;
+    }
+    if (id1 === id2) {
+      alert('Elige 2 servidores/listas distintos para combinar.');
+      return;
+    }
+    await db.collection('combos').add({
+      name: name,
+      memberIds: [id1, id2],
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('comboName').value = '';
+    document.getElementById('comboServer1').value = '';
+    document.getElementById('comboServer2').value = '';
+    showToast('Combo guardado');
+    await loadCombos();
+    renderCombosTable();
+  });
+  window.deleteCombo = async (id) => {
+    if (!confirm('¿Eliminar este combo? Los códigos que ya lo usan no se ven afectados.')) return;
+    await db.collection('combos').doc(id).delete();
+    await loadCombos();
+    renderCombosTable();
+  };
+
+  const defaultWhatsappTemplate = "Estimado/a *{clientName}*, le informamos cordialmente que su suscripción en *NEXO TV* con código *{code}* vencerá en *{daysLeft} días* ({expirationDate}) ⏳.\n\nLe invitamos a realizar su renovación con anticipación para asegurar que su servicio no sufra interrupciones. 📺✨\n\n¡Agradecemos su preferencia y le deseamos un excelente día! 🙏";
+
+  async function loadWhatsappConfig() {
+    try {
+      const doc = await db.collection('settings').doc('whatsapp_config').get();
+      if (doc.exists) {
+        const data = doc.data();
+        document.getElementById('whatsappAutoEnabled').checked = data.enabled === true;
+        document.getElementById('whatsappTemplate').value = data.template || defaultWhatsappTemplate;
+      } else {
+        document.getElementById('whatsappTemplate').value = defaultWhatsappTemplate;
+      }
+    } catch (e) {
+      document.getElementById('whatsappTemplate').value = defaultWhatsappTemplate;
+    }
+  }
+
+  document.getElementById('saveWhatsappConfigBtn')?.addEventListener('click', async () => {
+    const enabled = document.getElementById('whatsappAutoEnabled').checked;
+    const template = document.getElementById('whatsappTemplate').value;
+    await db.collection('settings').doc('whatsapp_config').set({
+      enabled: enabled,
+      template: template,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('Configuración de WhatsApp guardada');
+  });
+
+  function parseWhatsappTemplate(template, clientName, code, expirationDate, daysLeft) {
+    return template
+      .replace(/{clientName}/g, clientName || 'Cliente')
+      .replace(/{code}/g, code || '')
+      .replace(/{expirationDate}/g, expirationDate || '')
+      .replace(/{daysLeft}/g, daysLeft !== undefined ? daysLeft : '3');
+  }
+
+  window.openWhatsappForExpiringCode = (code, clientName, clientPhone, expirationDate) => {
+    if (!clientPhone) {
+      alert('Este cliente no tiene teléfono de WhatsApp registrado.');
+      return;
+    }
+    const template = document.getElementById('whatsappTemplate')?.value || defaultWhatsappTemplate;
+    const daysLeft = getDaysUntilExpiration(expirationDate) ?? 3;
+    const message = parseWhatsappTemplate(template, clientName, code, expirationDate, daysLeft);
+    const cleanPhone = clientPhone.replace(/\D/g, '');
+    const url = 'https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(message);
+    window.open(url, '_blank');
+  };
+
+  function getDaysUntilExpiration(expirationDate) {
+    if (!expirationDate) return null;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const exp = new Date(expirationDate + 'T00:00:00');
+    const diffTime = exp - today;
+    return Math.round(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  function renderWhatsappExpiringTable() {
+    const tbody = document.getElementById('whatsappExpiringTableBody');
+    if (!tbody) return;
+    const expiring3Days = lastSnapshotDocs.filter(({ data }) => {
+      if (!data.expirationDate || data.isDemo) return false;
+      const days = getDaysUntilExpiration(data.expirationDate);
+      return days === 3;
+    });
+
+    if (expiring3Days.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No hay clientes cuya suscripción venza exactamente en 3 días.</td></tr>';
+      return;
     }
 
-    async function saveToFirebase() {
-      // Recopilar datos
-      configData.updatedAt = new Date().toISOString();
-      configData.servers.primary = document.getElementById('primaryServer').value.trim();
-      configData.servers.backup = document.getElementById('backupServer').value.trim();
-      configData.servers.fallbacks = (configData.servers.fallbacks || []).map(f => f.trim()).filter(f => f.length > 0);
+    tbody.innerHTML = '';
+    expiring3Days.forEach(({ id: code, data }) => {
+      const clientName = data.clientName || 'Sin nombre';
+      const clientPhone = data.clientPhone || '-';
+      const expDate = data.expirationDate || '-';
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="code-cell">' + code + '</td>' +
+        '<td>' + clientName + '</td>' +
+        '<td>' + clientPhone + '</td>' +
+        '<td style="color:var(--orange); font-weight:700;">' + expDate + ' (Vence en 3 días)</td>' +
+        '<td class="actions-cell">' +
+          (data.clientPhone ? '<button style="background:#25D366; color:#fff;" onclick="openWhatsappForExpiringCode(\'' + code + '\', ' + JSON.stringify(clientName).replace(/"/g, '&quot;') + ', ' + JSON.stringify(clientPhone).replace(/"/g, '&quot;') + ', \'' + expDate + '\')">Enviar WhatsApp</button>' : '<span style="color:var(--muted); font-size:12px;">Sin teléfono</span>') +
+        '</td>';
+      tbody.appendChild(tr);
+    });
+  }
 
-      configData.settings.liveBufferMs = parseInt(document.getElementById('liveBuffer').value, 10) || 350;
-      configData.settings.autoReconnect = document.getElementById('autoReconnect').checked;
-      configData.settings.featuredChannelId = document.getElementById('featuredChannelId').value.trim();
+  function renderNotificationsView() {
+    const tbody = document.getElementById('notificationsTableBody');
+    if (!tbody) return;
+    const todayList = lastSnapshotDocs.filter(({ data }) => {
+      if (!data.expirationDate || data.isDemo) return false;
+      const days = getDaysUntilExpiration(data.expirationDate);
+      return days === 0;
+    });
 
-      configData.announcement.enabled = document.getElementById('announcementEnabled').checked;
-      configData.announcement.title = document.getElementById('announcementTitle').value.trim();
-      configData.announcement.message = document.getElementById('announcementMsg').value.trim();
-      configData.announcement.id = 'notice-' + Date.now();
+    document.getElementById('notifTodayCount').textContent = todayList.length;
 
-      configData.maintenance.enabled = document.getElementById('maintenanceEnabled').checked;
-      configData.maintenance.title = document.getElementById('maintenanceTitle').value.trim();
-      configData.maintenance.message = document.getElementById('maintenanceMsg').value.trim();
+    if (todayList.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No hay clientes que vencen exactamente hoy.</td></tr>';
+      return;
+    }
 
-      try {
-        const res = await fetch(FIREBASE_URL, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(configData)
-        });
+    tbody.innerHTML = '';
+    todayList.forEach(({ id: code, data }) => {
+      const clientName = data.clientName || 'Sin nombre';
+      const clientPhone = data.clientPhone || '-';
+      const expDate = data.expirationDate || '-';
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="code-cell">' + code + '</td>' +
+        '<td>' + clientName + '</td>' +
+        '<td>' + clientPhone + '</td>' +
+        '<td style="color:var(--orange); font-weight:700;">' + expDate + ' (Vence Hoy)</td>' +
+        '<td class="actions-cell">' +
+          (data.clientPhone ? '<button style="background:#25D366; color:#fff;" onclick="openWhatsappForNotifCode(\'' + code + '\', ' + JSON.stringify(clientName).replace(/"/g, '&quot;') + ', ' + JSON.stringify(clientPhone).replace(/"/g, '&quot;') + ', \'' + expDate + '\')">Enviar WhatsApp</button>' : '<span style="color:var(--muted); font-size:12px;">Sin teléfono</span>') +
+        '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+  window.renderNotificationsView = renderNotificationsView;
 
-        if (res.ok) {
-          showToast('⚡ ¡Cambios aplicados de inmediato en todos los televisores!');
-          document.getElementById('lastUpdateLabel').innerText = 'Actualizado: ' + new Date(configData.updatedAt).toLocaleTimeString();
-        } else {
-          alert('Error al guardar en Firebase: ' + res.statusText);
+  window.openWhatsappForNotifCode = (code, clientName, clientPhone, expirationDate) => {
+    if (!clientPhone) {
+      alert('Este cliente no tiene teléfono de WhatsApp registrado.');
+      return;
+    }
+    const template = document.getElementById('notifMessageInput')?.value || 'Hola {clientName}, tu servicio vence hoy.';
+    const message = template
+      .replace(/{clientName}/g, clientName || 'Cliente')
+      .replace(/{code}/g, code || '')
+      .replace(/{expirationDate}/g, expirationDate || '');
+    const cleanPhone = clientPhone.replace(/\D/g, '');
+    const url = 'https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(message);
+    window.open(url, '_blank');
+  };
+
+  window.sendBulkWhatsappToday = () => {
+    const todayList = lastSnapshotDocs.filter(({ data }) => {
+      if (!data.expirationDate || data.isDemo) return false;
+      const days = getDaysUntilExpiration(data.expirationDate);
+      return days === 0 && data.clientPhone;
+    });
+
+    if (todayList.length === 0) {
+      alert('No hay clientes con teléfono que vencan hoy.');
+      return;
+    }
+
+    if (!confirm('Se abrirá WhatsApp para ' + todayList.length + ' clientes que vencen hoy. ¿Deseas continuar?')) {
+      return;
+    }
+
+    todayList.forEach(({ id: code, data }, index) => {
+      setTimeout(() => {
+        openWhatsappForNotifCode(code, data.clientName, data.clientPhone, data.expirationDate);
+      }, index * 600);
+    });
+  };
+
+  function showToast(msg) {
+    const toast = document.getElementById('copyToast');
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 2000);
+  }
+
+  function populateEditServerSelects() {
+    const visibleServers = currentUserRole === 'subadmin'
+      ? serversList.filter(s => s.id === currentAssignedServerId)
+      : serversList;
+    const visibleCombos = currentUserRole === 'subadmin'
+      ? combosList.filter(c => ('combo::' + c.id) === currentAssignedServerId)
+      : combosList;
+    const optionsHtml = '<option value="">Selecciona uno...</option>' +
+      visibleServers.map(s => '<option value="' + s.host.replace(/"/g, '&quot;') + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
+    const comboOptionsHtml = visibleCombos.length === 0 ? '' :
+      '<optgroup label="Combos">' +
+        visibleCombos.map(c => '<option value="combo::' + c.id + '">' + c.name.replace(/</g, '&lt;') + ' (Combo)</option>').join('') +
+      '</optgroup>';
+    const select = document.getElementById('editServerSelect');
+    if (select) {
+      const currentValue = select.value;
+      select.innerHTML = optionsHtml + comboOptionsHtml;
+      select.value = currentValue;
+    }
+    const select2 = document.getElementById('editServerSelect2');
+    if (select2) {
+      const currentValue2 = select2.value;
+      select2.innerHTML = optionsHtml;
+      select2.value = currentValue2;
+    }
+  }
+
+  function onEditServerSelectChange() {
+    const select = document.getElementById('editServerSelect');
+    if (!select) return;
+    const value = currentUserRole === 'subadmin' ? (currentAssignedServerId || '') : select.value;
+    if (value.startsWith('combo::')) {
+      const comboId = value.substring('combo::'.length);
+      const combo = combosList.find(c => c.id === comboId);
+      const member1 = combo ? serversList.find(s => s.id === combo.memberIds[0]) : null;
+      const member2 = combo ? serversList.find(s => s.id === combo.memberIds[1]) : null;
+      document.getElementById('editXtreamCredFields').style.display = (member1 && member1.type !== 'm3u') ? 'block' : 'none';
+      document.getElementById('editUseSecondSourceRow').style.display = 'none';
+      document.getElementById('editSecondSourceBox').style.display = 'block';
+      document.getElementById('editServerSelect2Row').style.display = 'none';
+      document.getElementById('editXtreamCredFields2').style.display = (member2 && member2.type !== 'm3u') ? 'block' : 'none';
+      return;
+    }
+    document.getElementById('editUseSecondSourceRow').style.display = currentUserRole === 'subadmin' ? 'none' : 'block';
+    document.getElementById('editServerSelect2Row').style.display = 'block';
+    onEditUseSecondSourceChange();
+    const selected = serversList.find(s => s.host === value);
+    const isXtream = selected ? selected.type !== 'm3u' : false;
+    document.getElementById('editXtreamCredFields').style.display = isXtream ? 'block' : 'none';
+  }
+  window.onEditServerSelectChange = onEditServerSelectChange;
+
+  function onEditUseSecondSourceChange() {
+    const box = document.getElementById('editSecondSourceBox');
+    if (box) {
+      box.style.display = document.getElementById('editUseSecondSource').checked ? 'block' : 'none';
+    }
+  }
+  window.onEditUseSecondSourceChange = onEditUseSecondSourceChange;
+
+  function onEditServerSelect2Change() {
+    const select2 = document.getElementById('editServerSelect2');
+    if (!select2) return;
+    const selected = serversList.find(s => s.host === select2.value);
+    const isXtream = selected ? selected.type !== 'm3u' : false;
+    document.getElementById('editXtreamCredFields2').style.display = isXtream ? 'block' : 'none';
+  }
+  window.onEditServerSelect2Change = onEditServerSelect2Change;
+
+  window.openEditClientModal = async (code) => {
+    const doc = await db.collection('access_codes').doc(code).get();
+    if (!doc.exists) return;
+    const data = doc.data();
+    document.getElementById('editCode').value = code;
+    document.getElementById('editClientName').value = data.clientName || '';
+    document.getElementById('editClientPhone').value = data.clientPhone || '';
+    document.getElementById('editExpirationDate').value = data.expirationDate || '';
+    document.getElementById('editAllowTv').checked = data.allowTv !== false;
+    document.getElementById('editAllowMovies').checked = data.allowMovies !== false;
+    document.getElementById('editAllowSeries').checked = data.allowSeries !== false;
+
+    populateEditServerSelects();
+
+    const sources = Array.isArray(data.sources) && data.sources.length > 0 ? data.sources : [{
+      type: data.mode || 'xtream',
+      serverId: null,
+      host: data.host,
+      username: data.username,
+      password: data.password,
+      m3uUrl: data.m3uUrl
+    }];
+
+    if (sources.length === 2) {
+      const matchingCombo = combosList.find(c => c.memberIds.includes(sources[0].serverId) && c.memberIds.includes(sources[1].serverId));
+      if (matchingCombo) {
+        document.getElementById('editServerSelect').value = 'combo::' + matchingCombo.id;
+        document.getElementById('editUsername').value = sources[0].username || '';
+        document.getElementById('editXtreamPassword').value = sources[0].password || '';
+        document.getElementById('editUsername2').value = sources[1].username || '';
+        document.getElementById('editXtreamPassword2').value = sources[1].password || '';
+      } else {
+        const s1 = serversList.find(s => s.id === sources[0].serverId || s.host === sources[0].host || s.host === sources[0].m3uUrl);
+        const s2 = serversList.find(s => s.id === sources[1].serverId || s.host === sources[1].host || s.host === sources[1].m3uUrl);
+        if (s1) document.getElementById('editServerSelect').value = s1.host;
+        document.getElementById('editUsername').value = sources[0].username || '';
+        document.getElementById('editXtreamPassword').value = sources[0].password || '';
+
+        document.getElementById('editUseSecondSource').checked = true;
+        if (s2) document.getElementById('editServerSelect2').value = s2.host;
+        document.getElementById('editUsername2').value = sources[1].username || '';
+        document.getElementById('editXtreamPassword2').value = sources[1].password || '';
+      }
+    } else if (sources.length === 1) {
+      const s1 = serversList.find(s => s.id === sources[0].serverId || s.host === sources[0].host || s.host === sources[0].m3uUrl);
+      if (s1) {
+        document.getElementById('editServerSelect').value = s1.host;
+      }
+      document.getElementById('editUsername').value = sources[0].username || '';
+      document.getElementById('editXtreamPassword').value = sources[0].password || '';
+      document.getElementById('editUseSecondSource').checked = false;
+    }
+
+    onEditServerSelectChange();
+    onEditUseSecondSourceChange();
+    onEditServerSelect2Change();
+
+    document.getElementById('editClientModal').style.display = 'flex';
+  };
+
+  window.closeEditClientModal = () => {
+    document.getElementById('editClientModal').style.display = 'none';
+  };
+
+  window.saveEditClient = async () => {
+    const code = document.getElementById('editCode').value;
+    const clientName = document.getElementById('editClientName').value.trim();
+    const clientPhone = document.getElementById('editClientPhone').value.trim();
+    const expirationDate = document.getElementById('editExpirationDate').value;
+    
+    const selectedValue = currentUserRole === 'subadmin'
+      ? (currentAssignedServerId || '')
+      : document.getElementById('editServerSelect').value;
+    if (!selectedValue) {
+      alert('Selecciona un servidor, lista o combo de la lista.');
+      return;
+    }
+
+    const sources = [];
+    function buildEditSource(server, usernameFieldId, passwordFieldId) {
+      if (server.type === 'm3u') {
+        return { type: 'm3u', serverId: server.id, m3uUrl: server.host };
+      }
+      const username = document.getElementById(usernameFieldId).value.trim();
+      const password = document.getElementById(passwordFieldId).value.trim();
+      if (!username || !password) return null;
+      return { type: 'xtream', serverId: server.id, host: server.host, username: username, password: password };
+    }
+
+    if (selectedValue.startsWith('combo::')) {
+      const comboId = selectedValue.substring('combo::'.length);
+      const combo = combosList.find(c => c.id === comboId);
+      const member1 = combo ? serversList.find(s => s.id === combo.memberIds[0]) : null;
+      const member2 = combo ? serversList.find(s => s.id === combo.memberIds[1]) : null;
+      if (!member1 || !member2) {
+        alert('No se pudo cargar este combo.');
+        return;
+      }
+      const source1 = buildEditSource(member1, 'editUsername', 'editXtreamPassword');
+      if (member1.type !== 'm3u' && !source1) {
+        alert('Completa usuario y contraseña del primer servidor del combo.');
+        return;
+      }
+      const source2 = buildEditSource(member2, 'editUsername2', 'editXtreamPassword2');
+      if (member2.type !== 'm3u' && !source2) {
+        alert('Completa usuario y contraseña del segundo servidor del combo.');
+        return;
+      }
+      sources.push(source1, source2);
+    } else {
+      const selectedServer = serversList.find(s => s.host === selectedValue);
+      if (!selectedServer) {
+        alert('Selecciona un servidor o lista de la lista.');
+        return;
+      }
+      const source1 = buildEditSource(selectedServer, 'editUsername', 'editXtreamPassword');
+      if (selectedServer.type !== 'm3u' && !source1) {
+        alert('Completa usuario y contraseña.');
+        return;
+      }
+      sources.push(source1);
+      const useSecond = document.getElementById('editUseSecondSource').checked;
+      if (useSecond) {
+        const selectedHost2 = document.getElementById('editServerSelect2').value;
+        const selectedServer2 = serversList.find(s => s.host === selectedHost2);
+        if (!selectedServer2) {
+          alert('Selecciona el segundo servidor o lista.');
+          return;
         }
-      } catch (e) {
-        alert('Error de conexión: ' + e.message);
+        const source2 = buildEditSource(selectedServer2, 'editUsername2', 'editXtreamPassword2');
+        if (selectedServer2.type !== 'm3u' && !source2) {
+          alert('Completa usuario y contraseña del servidor adicional.');
+          return;
+        }
+        sources.push(source2);
       }
     }
 
-    // Iniciar escucha en tiempo real mediante SSE
-    function startRealtimeSync() {
-      try {
-        const es = new EventSource(FIREBASE_URL);
-        es.addEventListener('put', e => {
-          try {
-            const parsed = JSON.parse(e.data);
-            if (parsed.path === '/' && parsed.data) {
-              populateUI(parsed.data);
-            }
-          } catch (_) {}
-        });
-        es.onopen = () => {
-          document.getElementById('liveDot').style.background = 'var(--success)';
-          document.getElementById('liveStatusText').innerText = 'Conectado en tiempo real a Firebase';
-        };
-        es.onerror = () => {
-          document.getElementById('liveDot').style.background = 'var(--warning)';
-          document.getElementById('liveStatusText').innerText = 'Reconectando con Firebase...';
-        };
-      } catch (err) {
-        console.warn('SSE no disponible:', err);
-      }
+    const updates = {
+      clientName: clientName,
+      clientPhone: clientPhone,
+      expirationDate: expirationDate || null,
+      mode: sources[0].type,
+      host: sources[0].host || null,
+      username: sources[0].username || null,
+      password: sources[0].password || null,
+      m3uUrl: sources[0].m3uUrl || null,
+      sources: sources,
+      allowTv: document.getElementById('editAllowTv').checked,
+      allowMovies: document.getElementById('editAllowMovies').checked,
+      allowSeries: document.getElementById('editAllowSeries').checked,
+      lastModified: Date.now()
+    };
+
+    await db.collection('access_codes').doc(code).update(updates);
+    closeEditClientModal();
+    showToast('Cliente actualizado correctamente');
+  };
+
+  function renderGrowthChart() {
+    const container = document.getElementById('rechartsGrowthChart');
+    if (!container || !window.Recharts || !window.React || !window.ReactDOM) return;
+    
+    const daysMap = {};
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const displayKey = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+      daysMap[key] = { date: displayKey, rawDate: key, count: 0 };
     }
 
-    loadFromFirebase();
-    startRealtimeSync();
-  </script>
+    lastSnapshotDocs.forEach(({ data }) => {
+      if (data.createdAt) {
+        let dateObj = null;
+        if (data.createdAt.toDate) {
+          dateObj = data.createdAt.toDate();
+        } else if (typeof data.createdAt === 'string') {
+          dateObj = new Date(data.createdAt);
+        } else if (data.createdAt.seconds) {
+          dateObj = new Date(data.createdAt.seconds * 1000);
+        }
+        if (dateObj) {
+          const key = dateObj.toISOString().slice(0, 10);
+          if (daysMap[key]) {
+            daysMap[key].count++;
+          }
+        }
+      }
+    });
+
+    const chartData = Object.values(daysMap);
+    const { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } = window.Recharts;
+    const React = window.React;
+
+    const GrowthChartComponent = () => {
+      return React.createElement(
+        ResponsiveContainer,
+        { width: '100%', height: '100%' },
+        React.createElement(
+          LineChart,
+          { data: chartData, margin: { top: 10, right: 20, left: -25, bottom: 0 } },
+          React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: '#262b36' }),
+          React.createElement(XAxis, { dataKey: 'date', stroke: '#8a90a0', fontSize: 11, tickLine: false }),
+          React.createElement(YAxis, { stroke: '#8a90a0', fontSize: 11, allowDecimals: false, tickLine: false }),
+          React.createElement(Tooltip, {
+            contentStyle: { backgroundColor: '#171a22', borderColor: '#262b36', borderRadius: '10px', color: '#fff', fontSize: '13px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' },
+            formatter: (value) => [value, 'Nuevos códigos'],
+            labelStyle: { color: '#8a90a0', marginBottom: '4px', fontWeight: '600' }
+          }),
+          React.createElement(Line, { type: 'monotone', dataKey: 'count', stroke: '#ff7a2e', strokeWidth: 3, dot: { r: 3, fill: '#ff7a2e' }, activeDot: { r: 6, stroke: '#fff', strokeWidth: 2 } })
+        )
+      );
+    };
+
+    if (!window._growthRoot) {
+      window._growthRoot = ReactDOM.createRoot(container);
+    }
+    window._growthRoot.render(React.createElement(GrowthChartComponent));
+  }
+
+  // =========================================================================
+  // Control Remoto Nexo TV en Vivo (Firebase Realtime Database)
+  // =========================================================================
+  const NEXO_FIREBASE_RTDB_URL = 'https://nexo-tv-d8766-default-rtdb.firebaseio.com/config.json';
+  let nexoRemoteConfigData = null;
+
+  async function loadNexoRemoteConfig() {
+    try {
+      const res = await fetch(NEXO_FIREBASE_RTDB_URL + '?t=' + Date.now());
+      if (res.ok) {
+        const data = await res.json();
+        if (data) {
+          nexoRemoteConfigData = data;
+          populateNexoRemoteUI(data);
+        }
+      }
+    } catch (e) {
+      console.warn('Error cargando config remota Nexo TV:', e);
+    }
+  }
+
+  function populateNexoRemoteUI(cfg) {
+    if (!cfg) return;
+    document.getElementById('nexoPrimaryServer').value = cfg.servers?.primary || '';
+    document.getElementById('nexoBackupServer').value = cfg.servers?.backup || '';
+    document.getElementById('nexoLiveBuffer').value = cfg.settings?.liveBufferMs || 350;
+    document.getElementById('nexoFeaturedChannelId').value = cfg.settings?.featuredChannelId || '';
+    document.getElementById('nexoAutoReconnect').checked = cfg.settings?.autoReconnect !== false;
+
+    document.getElementById('nexoAnnouncementEnabled').checked = !!cfg.announcement?.enabled;
+    document.getElementById('nexoAnnouncementTitle').value = cfg.announcement?.title || '';
+    document.getElementById('nexoAnnouncementMsg').value = cfg.announcement?.message || '';
+
+    document.getElementById('nexoMaintenanceEnabled').checked = !!cfg.maintenance?.enabled;
+    document.getElementById('nexoMaintenanceTitle').value = cfg.maintenance?.title || '';
+    document.getElementById('nexoMaintenanceMsg').value = cfg.maintenance?.message || '';
+
+    if (cfg.updatedAt) {
+      document.getElementById('nexoLastUpdateLabel').innerText = 'Actualizado: ' + new Date(cfg.updatedAt).toLocaleTimeString();
+    }
+  }
+
+  async function saveNexoRemoteConfig() {
+    if (!nexoRemoteConfigData) {
+      nexoRemoteConfigData = {
+        servers: { primary: '', backup: '', fallbacks: ['http://eliteplusec.com', 'http://eliteplusec.com:80'] },
+        maintenance: { enabled: false, title: '', message: '' },
+        announcement: { enabled: false, id: 'notice-1', title: '', message: '', type: 'info' },
+        settings: { liveBufferMs: 350, autoReconnect: true, featuredChannelId: '' }
+      };
+    }
+    nexoRemoteConfigData.updatedAt = new Date().toISOString();
+    nexoRemoteConfigData.servers.primary = document.getElementById('nexoPrimaryServer').value.trim();
+    nexoRemoteConfigData.servers.backup = document.getElementById('nexoBackupServer').value.trim();
+    nexoRemoteConfigData.settings.liveBufferMs = parseInt(document.getElementById('nexoLiveBuffer').value, 10) || 350;
+    nexoRemoteConfigData.settings.featuredChannelId = document.getElementById('nexoFeaturedChannelId').value.trim();
+    nexoRemoteConfigData.settings.autoReconnect = document.getElementById('nexoAutoReconnect').checked;
+
+    nexoRemoteConfigData.announcement.enabled = document.getElementById('nexoAnnouncementEnabled').checked;
+    nexoRemoteConfigData.announcement.title = document.getElementById('nexoAnnouncementTitle').value.trim();
+    nexoRemoteConfigData.announcement.message = document.getElementById('nexoAnnouncementMsg').value.trim();
+    nexoRemoteConfigData.announcement.id = 'notice-' + Date.now();
+
+    nexoRemoteConfigData.maintenance.enabled = document.getElementById('nexoMaintenanceEnabled').checked;
+    nexoRemoteConfigData.maintenance.title = document.getElementById('nexoMaintenanceTitle').value.trim();
+    nexoRemoteConfigData.maintenance.message = document.getElementById('nexoMaintenanceMsg').value.trim();
+
+    try {
+      const btn = document.getElementById('saveNexoRemoteConfigBtn');
+      btn.disabled = true;
+      btn.innerText = 'Transmitiendo a los televisores...';
+      const res = await fetch(NEXO_FIREBASE_RTDB_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nexoRemoteConfigData)
+      });
+      btn.disabled = false;
+      btn.innerText = '⚡ Transmitir en Vivo a los Televisores';
+      if (res.ok) {
+        showToast('⚡ ¡Cambios transmitidos en vivo a los televisores!');
+        document.getElementById('nexoLastUpdateLabel').innerText = 'Actualizado: ' + new Date(nexoRemoteConfigData.updatedAt).toLocaleTimeString();
+      } else {
+        alert('Error al guardar en Firebase: ' + res.statusText);
+      }
+    } catch (e) {
+      document.getElementById('saveNexoRemoteConfigBtn').disabled = false;
+      document.getElementById('saveNexoRemoteConfigBtn').innerText = '⚡ Transmitir en Vivo a los Televisores';
+      alert('Error de conexión: ' + e.message);
+    }
+  }
+
+  // Escucha SSE en tiempo real para el control remoto
+  function initNexoRemoteSSE() {
+    try {
+      const es = new EventSource(NEXO_FIREBASE_RTDB_URL);
+      es.addEventListener('put', e => {
+        try {
+          const parsed = JSON.parse(e.data);
+          if (parsed.path === '/' && parsed.data) {
+            nexoRemoteConfigData = parsed.data;
+            populateNexoRemoteUI(parsed.data);
+          }
+        } catch (_) {}
+      });
+      es.onopen = () => {
+        const dot = document.getElementById('nexoLiveDot');
+        if (dot) dot.style.background = 'var(--green)';
+        const st = document.getElementById('nexoLiveStatusText');
+        if (st) st.innerText = 'Conectado en tiempo real a Firebase';
+      };
+      es.onerror = () => {
+        const dot = document.getElementById('nexoLiveDot');
+        if (dot) dot.style.background = 'var(--red)';
+        const st = document.getElementById('nexoLiveStatusText');
+        if (st) st.innerText = 'Reconectando con Firebase...';
+      };
+    } catch (_) {}
+  }
+  initNexoRemoteSSE();
+
+</script>
+
+<!-- Modal de Edición de Cliente -->
+<div id="editClientModal" class="menu-overlay" style="display:none; align-items:center; justify-content:center; z-index:1000;">
+  <div class="card" style="width:100%; max-width:440px; margin:20px; max-height:90vh; overflow-y:auto; position:relative; background:var(--surface); border:1px solid var(--border);">
+    <h2 style="margin-top:0; font-size:18px;">Editar Cliente</h2>
+    <input type="hidden" id="editCode" />
+    <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Nombre del cliente</label>
+    <input id="editClientName" type="text" placeholder="Nombre" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" />
+    <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Teléfono (WhatsApp)</label>
+    <input id="editClientPhone" type="tel" placeholder="Teléfono" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" />
+    <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Fecha de vencimiento</label>
+    <input id="editExpirationDate" type="date" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" />
+    
+    <div id="editServerSelectRow">
+      <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor / lista / combo</label>
+      <select id="editServerSelect" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" onchange="onEditServerSelectChange()">
+        <option value="">Selecciona uno...</option>
+      </select>
+    </div>
+    <div id="editXtreamCredFields" style="display:none;">
+      <input id="editUsername" type="text" placeholder="Usuario" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+      <input id="editXtreamPassword" type="text" placeholder="Contraseña" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+    </div>
+    <div id="editUseSecondSourceRow">
+      <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
+        <input type="checkbox" id="editUseSecondSource" style="width:auto; margin:0;" onchange="onEditUseSecondSourceChange()" />
+        Juntar con un segundo servidor o lista
+      </label>
+    </div>
+    <div id="editSecondSourceBox" style="display:none;">
+      <div id="editServerSelect2Row">
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor / lista adicional</label>
+        <select id="editServerSelect2" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" onchange="onEditServerSelect2Change()">
+          <option value="">Selecciona uno...</option>
+        </select>
+      </div>
+      <div id="editXtreamCredFields2" style="display:none;">
+        <input id="editUsername2" type="text" placeholder="Usuario" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+        <input id="editXtreamPassword2" type="text" placeholder="Contraseña" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+
+    <div style="margin: 12px 0;">
+      <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Servicios permitidos para el cliente</label>
+      <div style="display:flex; gap:16px; flex-wrap:wrap;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="editAllowTv" style="width:auto; margin:0;" checked /> TV / En vivo
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="editAllowMovies" style="width:auto; margin:0;" checked /> Películas
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="editAllowSeries" style="width:auto; margin:0;" checked /> Series
+        </label>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:10px;">
+      <button class="secondary" style="flex:1;" onclick="closeEditClientModal()">Cancelar</button>
+      <button class="full" style="flex:1; margin-top:0;" onclick="saveEditClient()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
