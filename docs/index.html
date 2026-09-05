@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Administrativo — NEXO TV</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0c0d12;
+      --card-bg: #151722;
+      --card-border: #232738;
+      --accent: #ff6b00;
+      --accent-hover: #ff8533;
+      --accent-glow: rgba(255, 107, 0, 0.25);
+      --text-main: #f1f3f9;
+      --text-muted: #8b92a8;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at top right, #1f1a18 0%, var(--bg) 60%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Bar */
+    header {
+      background: rgba(21, 23, 34, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, #ff8533, #ff5500);
+      color: white;
+      font-weight: 900;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #ff7a1a, #ff5500);
+      color: white;
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #ff8a33, #ff6600);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: #232738;
+      color: var(--text-main);
+      border: 1px solid #32374e;
+    }
+
+    .btn-secondary:hover {
+      background: #2d3247;
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+    }
+
+    .btn-outline:hover {
+      color: var(--text-main);
+      border-color: #3b415a;
+    }
+
+    /* Container */
+    main {
+      flex: 1;
+      max-width: 1180px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 28px 20px 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* GitHub Auth banner */
+    .auth-banner {
+      background: linear-gradient(135deg, rgba(255, 107, 0, 0.08), rgba(21, 23, 34, 0.95));
+      border: 1px solid rgba(255, 107, 0, 0.25);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .auth-status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--danger);
+      box-shadow: 0 0 10px var(--danger);
+    }
+
+    .status-dot.connected {
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success);
+    }
+
+    /* Grid Sections */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 17px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-title svg {
+      color: var(--accent);
+    }
+
+    /* Form Fields */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .input-text, .select, .textarea {
+      background: #0f1118;
+      border: 1px solid #282c40;
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+
+    .input-text:focus, .select:focus, .textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #0f1118;
+      border-radius: 10px;
+      border: 1px solid #24283b;
+    }
+
+    .toggle-info h4 {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .toggle-info p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Switch */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 26px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #2b3044;
+      transition: .3s;
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+
+    /* Server list */
+    .fallback-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .fallback-item {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-danger-icon {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: var(--danger);
+      border-radius: 8px;
+      width: 42px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-danger-icon:hover {
+      background: var(--danger);
+      color: white;
+    }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1c202e;
+      border: 1px solid var(--accent);
+      color: white;
+      padding: 14px 22px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      gap: 10px;
+      z-index: 100;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(8px);
+      display: none;
+      place-items: center;
+      z-index: 99;
+      padding: 20px;
+    }
+
+    .modal-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 28px;
+      max-width: 480px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-badge">N</div>
+      <div>
+        <div class="brand-title">NEXO TV</div>
+        <div class="brand-sub">Panel de Administración Web</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline" onclick="loadRemoteConfig()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        Recargar
+      </button>
+      <button class="btn btn-primary" onclick="saveConfig()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Guardar en GitHub
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- GitHub Token Banner -->
+    <div class="auth-banner">
+      <div class="auth-status">
+        <div class="status-dot" id="authDot"></div>
+        <div>
+          <div style="font-weight: 700; font-size: 14px;" id="authStatusText">Conexión con GitHub no configurada</div>
+          <div style="font-size: 12px; color: var(--text-muted);" id="authRepoText">Repositorio: pjaraf/nexo-clean (archivo nexo-config.json)</div>
+        </div>
+      </div>
+      <button class="btn btn-secondary" onclick="openAuthModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Configurar Token de GitHub
+      </button>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="grid-2">
+
+      <!-- Servidores IPTV -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+            Servidores Xtream / IPTV
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="primaryServer">Servidor Primario (Por defecto en la App)</label>
+          <input type="text" id="primaryServer" class="input-text" placeholder="http://servidor:8080" />
+        </div>
+
+        <div class="field">
+          <label for="backupServer">Servidor de Respaldo</label>
+          <input type="text" id="backupServer" class="input-text" placeholder="https://servidor-backup.com" />
+        </div>
+
+        <div class="field">
+          <label>Servidores Alternativos / Fallbacks</label>
+          <div class="fallback-list" id="fallbackList"></div>
+          <button class="btn btn-outline" style="margin-top: 8px;" onclick="addFallback()">
+            + Agregar Servidor Alternativo
+          </button>
+        </div>
+      </div>
+
+      <!-- Ajustes del Reproductor & Canales -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Streaming y Reproductor
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="liveBuffer">Buffer de Transmisión en Vivo (ms)</label>
+          <input type="number" id="liveBuffer" class="input-text" min="100" max="5000" step="50" value="350" />
+          <span style="font-size: 11px; color: var(--text-muted);">Recomendado: 350 ms para zapping rápido y absorción de jitter.</span>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <h4>Reconexión Automática</h4>
+            <p>Reconectar de inmediato si el canal se congela o corta</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="autoReconnect" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label for="featuredChannelId">ID de Canal Forzado en el Home (Opcional)</label>
+          <input type="text" id="featuredChannelId" class="input-text" placeholder="Dejar vacío para reproducir el último visto" />
+        </div>
+      </div>
+
+      <!-- Avisos y Mensajes en Pantalla -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Avisos Globales a Usuarios
+          </div>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <h4>Mostrar Aviso Global</h4>
+            <p>Aparece como notificación para todos los usuarios</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="announcementEnabled">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label for="announcementTitle">Título del Aviso</label>
+          <input type="text" id="announcementTitle" class="input-text" placeholder="Ej. Actualización de Canales" />
+        </div>
+
+        <div class="field">
+          <label for="announcementMsg">Mensaje</label>
+          <textarea id="announcementMsg" class="textarea" placeholder="Escribe el mensaje que verán los usuarios en su TV..."></textarea>
+        </div>
+      </div>
+
+      <!-- Modo Mantenimiento -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Modo Mantenimiento
+          </div>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <h4>Activar Bloqueo por Mantenimiento</h4>
+            <p>Pausa temporalmente el acceso con aviso explicativo</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="maintenanceEnabled">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label for="maintenanceTitle">Título de Mantenimiento</label>
+          <input type="text" id="maintenanceTitle" class="input-text" placeholder="Ej. Mantenimiento del Sistema" />
+        </div>
+
+        <div class="field">
+          <label for="maintenanceMsg">Mensaje</label>
+          <textarea id="maintenanceMsg" class="textarea" placeholder="Estamos mejorando los servidores. Volvemos en breve."></textarea>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Modal Auth -->
+  <div class="modal-overlay" id="authModal">
+    <div class="modal-card">
+      <div style="font-size: 18px; font-weight: 700;">Conectar con GitHub</div>
+      <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+        Para guardar los cambios directamente en el repositorio desde la web, ingresa un <strong>GitHub Personal Access Token (PAT)</strong> con permiso de escritura (<code>repo</code> o <code>contents:write</code>).
+      </p>
+      <div class="field">
+        <label for="githubToken">GitHub Token (ghp_... o github_pat_...)</label>
+        <input type="password" id="githubToken" class="input-text" placeholder="Pega tu token aquí..." />
+      </div>
+      <div class="field">
+        <label for="githubRepo">Repositorio (Usuario/Repo)</label>
+        <input type="text" id="githubRepo" class="input-text" value="pjaraf/nexo-clean" />
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+        <button class="btn btn-outline" onclick="closeAuthModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveAuthToken()">Guardar Credencial</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast">Configuración actualizada</div>
+
+  <script>
+    const CONFIG_PATH = 'nexo-config.json';
+    let fileSha = null;
+
+    let configData = {
+      updatedAt: new Date().toISOString(),
+      servers: {
+        primary: "http://eliteplusec.com:8080",
+        backup: "https://nexo.fusionx.cl",
+        fallbacks: ["http://eliteplusec.com", "http://eliteplusec.com:80"]
+      },
+      maintenance: {
+        enabled: false,
+        title: "Mantenimiento del Sistema",
+        message: "Estamos realizando mejoras en el servicio. Volveremos en breve."
+      },
+      announcement: {
+        enabled: false,
+        id: "notice-1",
+        title: "Aviso Importante",
+        message: "Bienvenido a Nexo TV. Disfruta de la mejor programación.",
+        type: "info"
+      },
+      settings: {
+        liveBufferMs: 350,
+        autoReconnect: true,
+        featuredChannelId: ""
+      }
+    };
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.style.display = 'flex';
+      setTimeout(() => { toast.style.display = 'none'; }, 3500);
+    }
+
+    function getStoredToken() {
+      return localStorage.getItem('nexo_gh_token') || '';
+    }
+
+    function getStoredRepo() {
+      return localStorage.getItem('nexo_gh_repo') || 'pjaraf/nexo-clean';
+    }
+
+    function updateAuthStatusUI() {
+      const token = getStoredToken();
+      const dot = document.getElementById('authDot');
+      const title = document.getElementById('authStatusText');
+      const repo = document.getElementById('authRepoText');
+
+      repo.innerText = `Repositorio: ${getStoredRepo()} (${CONFIG_PATH})`;
+      if (token) {
+        dot.classList.add('connected');
+        title.innerText = 'Conectado a GitHub (Listo para guardar cambios)';
+      } else {
+        dot.classList.remove('connected');
+        title.innerText = 'Modo Lectura (Configura un Token para guardar)';
+      }
+    }
+
+    function openAuthModal() {
+      document.getElementById('githubToken').value = getStoredToken();
+      document.getElementById('githubRepo').value = getStoredRepo();
+      document.getElementById('authModal').style.display = 'grid';
+    }
+
+    function closeAuthModal() {
+      document.getElementById('authModal').style.display = 'none';
+    }
+
+    function saveAuthToken() {
+      const token = document.getElementById('githubToken').value.trim();
+      const repo = document.getElementById('githubRepo').value.trim() || 'pjaraf/nexo-clean';
+      if (token) {
+        localStorage.setItem('nexo_gh_token', token);
+      } else {
+        localStorage.removeItem('nexo_gh_token');
+      }
+      localStorage.setItem('nexo_gh_repo', repo);
+      closeAuthModal();
+      updateAuthStatusUI();
+      showToast('Credenciales guardadas.');
+      loadRemoteConfig();
+    }
+
+    function renderFallbacks() {
+      const container = document.getElementById('fallbackList');
+      container.innerHTML = '';
+      configData.servers.fallbacks.forEach((url, index) => {
+        const item = document.createElement('div');
+        item.className = 'fallback-item';
+        item.innerHTML = `
+          <input type="text" class="input-text" value="${url}" oninput="configData.servers.fallbacks[${index}] = this.value" />
+          <button class="btn-danger-icon" onclick="removeFallback(${index})">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function addFallback() {
+      configData.servers.fallbacks.push('');
+      renderFallbacks();
+    }
+
+    function removeFallback(idx) {
+      configData.servers.fallbacks.splice(idx, 1);
+      renderFallbacks();
+    }
+
+    function populateUI(data) {
+      configData = data;
+      document.getElementById('primaryServer').value = data.servers?.primary || '';
+      document.getElementById('backupServer').value = data.servers?.backup || '';
+      renderFallbacks();
+
+      document.getElementById('liveBuffer').value = data.settings?.liveBufferMs || 350;
+      document.getElementById('autoReconnect').checked = data.settings?.autoReconnect !== false;
+      document.getElementById('featuredChannelId').value = data.settings?.featuredChannelId || '';
+
+      document.getElementById('announcementEnabled').checked = !!data.announcement?.enabled;
+      document.getElementById('announcementTitle').value = data.announcement?.title || '';
+      document.getElementById('announcementMsg').value = data.announcement?.message || '';
+
+      document.getElementById('maintenanceEnabled').checked = !!data.maintenance?.enabled;
+      document.getElementById('maintenanceTitle').value = data.maintenance?.title || '';
+      document.getElementById('maintenanceMsg').value = data.maintenance?.message || '';
+    }
+
+    async function loadRemoteConfig() {
+      const repo = getStoredRepo();
+      const token = getStoredToken();
+      
+      // Intentar primero vía API de GitHub si hay token para tener el SHA del commit
+      if (token) {
+        try {
+          const res = await fetch(`https://api.github.com/repos/${repo}/contents/${CONFIG_PATH}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          });
+          if (res.ok) {
+            const fileData = await res.json();
+            fileSha = fileData.sha;
+            const content = decodeURIComponent(escape(atob(fileData.content.replace(/\s/g, ''))));
+            populateUI(JSON.parse(content));
+            showToast('Configuración cargada desde GitHub.');
+            return;
+          }
+        } catch (e) {
+          console.warn('Fallo API GitHub:', e);
+        }
+      }
+
+      // Fallback a raw github / archivo local
+      try {
+        const res = await fetch(`https://raw.githubusercontent.com/${repo}/main/${CONFIG_PATH}?t=${Date.now()}`);
+        if (res.ok) {
+          const data = await res.json();
+          populateUI(data);
+          showToast('Configuración cargada (modo lectura).');
+          return;
+        }
+      } catch (e) {
+        console.warn('Fallo raw github:', e);
+      }
+
+      // Fallback relativo si se aloja en el mismo dominio
+      try {
+        const res = await fetch(`../${CONFIG_PATH}?t=${Date.now()}`);
+        if (res.ok) {
+          const data = await res.json();
+          populateUI(data);
+        }
+      } catch (_) {}
+    }
+
+    async function saveConfig() {
+      const token = getStoredToken();
+      if (!token) {
+        openAuthModal();
+        return;
+      }
+
+      // Recopilar datos desde la UI
+      configData.updatedAt = new Date().toISOString();
+      configData.servers.primary = document.getElementById('primaryServer').value.trim();
+      configData.servers.backup = document.getElementById('backupServer').value.trim();
+      configData.servers.fallbacks = configData.servers.fallbacks.map(f => f.trim()).filter(f => f.length > 0);
+
+      configData.settings.liveBufferMs = parseInt(document.getElementById('liveBuffer').value, 10) || 350;
+      configData.settings.autoReconnect = document.getElementById('autoReconnect').checked;
+      configData.settings.featuredChannelId = document.getElementById('featuredChannelId').value.trim();
+
+      configData.announcement.enabled = document.getElementById('announcementEnabled').checked;
+      configData.announcement.title = document.getElementById('announcementTitle').value.trim();
+      configData.announcement.message = document.getElementById('announcementMsg').value.trim();
+      configData.announcement.id = 'notice-' + Date.now();
+
+      configData.maintenance.enabled = document.getElementById('maintenanceEnabled').checked;
+      configData.maintenance.title = document.getElementById('maintenanceTitle').value.trim();
+      configData.maintenance.message = document.getElementById('maintenanceMsg').value.trim();
+
+      const repo = getStoredRepo();
+      const jsonString = JSON.stringify(configData, null, 2);
+      const encodedContent = btoa(unescape(encodeURIComponent(jsonString)));
+
+      // Asegurar que tenemos el último sha
+      if (!fileSha) {
+        try {
+          const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${CONFIG_PATH}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          });
+          if (checkRes.ok) {
+            const checkData = await checkRes.json();
+            fileSha = checkData.sha;
+          }
+        } catch (_) {}
+      }
+
+      try {
+        const payload = {
+          message: 'Actualizar configuración remota desde Panel Web',
+          content: encodedContent,
+          branch: 'main'
+        };
+        if (fileSha) payload.sha = fileSha;
+
+        const res = await fetch(`https://api.github.com/repos/${repo}/contents/${CONFIG_PATH}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/vnd.github.v3+json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const savedData = await res.json();
+          fileSha = savedData.content?.sha || null;
+          showToast('✅ ¡Guardado con éxito en GitHub! La app TV se actualizará sola.');
+        } else {
+          const err = await res.json();
+          alert('Error al guardar en GitHub: ' + (err.message || 'Verifica los permisos del Token'));
+        }
+      } catch (e) {
+        alert('Error de conexión con GitHub: ' + e.message);
+      }
+    }
+
+    // Inicio
+    updateAuthStatusUI();
+    loadRemoteConfig();
+  </script>
+</body>
+</html>

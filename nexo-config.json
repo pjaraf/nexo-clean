@@ -1,0 +1,28 @@
+{
+  "updatedAt": "2026-09-05T19:30:00Z",
+  "servers": {
+    "primary": "http://eliteplusec.com:8080",
+    "backup": "https://nexo.fusionx.cl",
+    "fallbacks": [
+      "http://eliteplusec.com",
+      "http://eliteplusec.com:80"
+    ]
+  },
+  "maintenance": {
+    "enabled": false,
+    "title": "Mantenimiento del Sistema",
+    "message": "Estamos realizando mejoras en el servicio. Volveremos en breve."
+  },
+  "announcement": {
+    "enabled": false,
+    "id": "notice-1",
+    "title": "Aviso Importante",
+    "message": "Bienvenido a Nexo TV. Disfruta de la mejor programación.",
+    "type": "info"
+  },
+  "settings": {
+    "liveBufferMs": 350,
+    "autoReconnect": true,
+    "featuredChannelId": ""
+  }
+}

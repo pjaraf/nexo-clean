@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         keepAwakeWhileVisible()
+        com.nexo.tv.data.AppConfig.init(this)
         com.nexo.tv.player.StreamBridge.start()
 
         val bootUser = intent.getStringExtra("user")
@@ -41,6 +42,11 @@ class MainActivity : ComponentActivity() {
             var screen by remember { mutableStateOf(start) }
             var splashMsg by remember { mutableStateOf("Iniciando…") }
             var lastBackAt by remember { mutableLongStateOf(0L) }
+
+            // Sincronizar configuración remota desde GitHub en background
+            LaunchedEffect(Unit) {
+                com.nexo.tv.data.AppConfig.sync(this@MainActivity)
+            }
 
             LaunchedEffect(screen) {
                 if (screen != AppScreen.Loading) return@LaunchedEffect

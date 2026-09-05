@@ -432,7 +432,8 @@ class VlcEngine(context: Context) {
     private fun openMedia(url: String, vod: Boolean) {
         if (released) return
         lastOpenAt = SystemClock.uptimeMillis()
-        val cache = if (vod) VOD_CACHE_MS else LIVE_CACHE_MS
+        val remoteBuffer = com.nexo.tv.data.AppConfig.current.settings.liveBufferMs.coerceIn(50, 5000)
+        val cache = if (vod) VOD_CACHE_MS else remoteBuffer
         try {
             val media = Media(lib, Uri.parse(url)).apply {
                 try { setHWDecoderEnabled(true, false) } catch (_: Throwable) {}

@@ -11,12 +11,16 @@ object XtreamClient {
     private const val UA =
         "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36 VLC/3.0.18"
 
-    private val hosts = listOf(
-        Session.SERVER_ELITE,
-        "http://eliteplusec.com",
-        "http://eliteplusec.com:80",
-        Session.SERVER_NEXO
-    )
+    private fun dynamicHosts(): List<String> {
+        val cfg = AppConfig.current.servers
+        val list = mutableListOf<String>()
+        if (cfg.primary.isNotBlank()) list.add(cfg.primary)
+        if (cfg.backup.isNotBlank()) list.add(cfg.backup)
+        list.addAll(cfg.fallbacks)
+        list.add(Session.SERVER_ELITE)
+        list.add(Session.SERVER_NEXO)
+        return list.distinct()
+    }
 
     private val gson = Gson()
 
@@ -58,7 +62,7 @@ object XtreamClient {
             val p = Session.password
             if (u.isBlank() || p.isBlank()) return@withContext null
             val preferred = Session.server
-            val order = (listOf(preferred) + hosts).distinct()
+            val order = (listOf(preferred) + dynamicHosts()).distinct()
             for (base in order) {
                 val body = tryGet(apiUrl(base, action, extra, u, p))
                 if (!body.isNullOrBlank()) {

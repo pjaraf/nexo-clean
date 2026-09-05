@@ -43,11 +43,13 @@ object Session {
 
     var server: String
         get() {
-            val stored = prefs.getString("server", SERVER) ?: SERVER
+            val remotePrimary = com.nexo.tv.data.AppConfig.current.servers.primary.trim().trimEnd('/')
+            val defaultFallback = if (remotePrimary.isNotBlank()) remotePrimary else SERVER
+            val stored = prefs.getString("server", defaultFallback) ?: defaultFallback
             if (stored.contains("10.250.") || stored.contains("192.168.") || stored.contains("127.0.0.1")) {
-                return SERVER
+                return defaultFallback
             }
-            return stored.ifBlank { SERVER }
+            return stored.ifBlank { defaultFallback }
         }
         set(value) {
             val clean = if (value.contains("10.250.") || value.contains("192.168.")) SERVER else value

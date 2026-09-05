@@ -272,7 +272,8 @@ fun HubScreen(onLogout: () -> Unit) {
         allChannels = streams
 
         val savedChannelId = prefs.getString(KEY_CHANNEL, null).orEmpty()
-        val savedChannel = streams.firstOrNull { it.id == savedChannelId }
+        val targetChannelId = com.nexo.tv.data.AppConfig.current.settings.featuredChannelId.ifBlank { savedChannelId }
+        val savedChannel = if (targetChannelId.isNotBlank()) streams.firstOrNull { it.id == targetChannelId } else null
 
         val catId = when {
             savedChannel != null -> savedChannel.categoryId.orEmpty()
@@ -285,7 +286,7 @@ fun HubScreen(onLogout: () -> Unit) {
 
         val list = if (catId.isBlank()) streams else streams.filter { it.categoryId == catId }.ifEmpty { streams }
         val playIdx = when {
-            savedChannelId.isNotBlank() -> list.indexOfFirst { it.id == savedChannelId }.takeIf { it >= 0 } ?: 0
+            targetChannelId.isNotBlank() -> list.indexOfFirst { it.id == targetChannelId }.takeIf { it >= 0 } ?: 0
             else -> 0
         }
         val start = list.getOrNull(playIdx)
