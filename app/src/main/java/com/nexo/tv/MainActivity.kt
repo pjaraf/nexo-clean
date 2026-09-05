@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         keepAwakeWhileVisible()
+        com.nexo.tv.player.StreamBridge.start()
 
         val bootUser = intent.getStringExtra("user")
         val bootPass = intent.getStringExtra("pass")

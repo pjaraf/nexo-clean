@@ -1,7 +1,14 @@
 package com.nexo.tv.ui
 
+import android.content.Context
 import android.content.Intent
+import android.view.KeyEvent as AndroidKeyEvent
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -17,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,8 +39,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,31 +61,55 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.nexo.tv.AppExit
+import com.nexo.tv.CategorySidePanel
+import com.nexo.tv.ChannelSideBanner
 import com.nexo.tv.LiveActivity
 import com.nexo.tv.MovieActivity
 import com.nexo.tv.SeriesActivity
 import com.nexo.tv.Session
 import com.nexo.tv.data.Catalog
 import com.nexo.tv.data.CategoryShelf
+import com.nexo.tv.data.LiveCategory
+import com.nexo.tv.data.LiveChannel
 import com.nexo.tv.data.SeriesItem
 import com.nexo.tv.data.VodItem
+import com.nexo.tv.data.XtreamClient
+import com.nexo.tv.player.StreamBridge
+import com.nexo.tv.player.VlcEngine
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.videolan.libvlc.util.VLCVideoLayout
+import kotlin.math.roundToInt
 
 private val Orange = Color(0xFFDE5B17)
 private val PosterW = 132.dp
 private val PosterH = 188.dp
+
+private const val PREFS = "nexo_live"
+private const val KEY_CHANNEL = "channel_id"
+private const val KEY_CATEGORY = "category_id"
 
 private enum class Tab { HOME, TV, SERIES, MOVIES }
 
@@ -85,13 +117,210 @@ private enum class Tab { HOME, TV, SERIES, MOVIES }
 fun HubScreen(onLogout: () -> Unit) {
     val ctx = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val density = LocalDensity.current
+    val prefs = remember { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+    val engine = remember { VlcEngine(ctx) }
+
     var tab by remember { mutableStateOf(Tab.HOME) }
     val movies = Catalog.movies
     val series = Catalog.series
     val movies2026 = remember(movies) { movies.filter { it.matchesYear(2026) } }
     val liveFocus = remember { FocusRequester() }
 
-    // Foco por defecto en TV en vivo (OK abre canales).
+    // Estado de canales en vivo para el mini reproductor y pantalla completa
+    var allChannels by remember { mutableStateOf<List<LiveChannel>>(Catalog.liveChannels) }
+    var categories by remember { mutableStateOf<List<LiveCategory>>(Catalog.liveCategories) }
+    var selectedCategoryId by remember {
+        mutableStateOf(prefs.getString(KEY_CATEGORY, null).orEmpty())
+    }
+    var index by remember { mutableIntStateOf(0) }
+    var fullScreen by remember { mutableStateOf(false) }
+    var showBanner by remember { mutableStateOf(false) }
+    var bannerTick by remember { mutableIntStateOf(0) }
+    var showCategories by remember { mutableStateOf(false) }
+
+    // Medidas y posición de la ranura (slot) en HomePane
+    var slotX by remember { mutableIntStateOf(0) }
+    var slotY by remember { mutableIntStateOf(0) }
+    var slotW by remember { mutableIntStateOf(0) }
+    var slotH by remember { mutableIntStateOf(0) }
+
+    val fullScreenFocus = remember { FocusRequester() }
+    val categoryFocus = remember { FocusRequester() }
+    val catListState = rememberLazyListState()
+
+    val activeChannels = remember(allChannels, selectedCategoryId) {
+        if (selectedCategoryId.isBlank()) allChannels
+        else allChannels.filter { it.categoryId == selectedCategoryId }.ifEmpty { allChannels }
+    }
+    val selectedCategoryName = remember(categories, selectedCategoryId) {
+        categories.firstOrNull { it.categoryId == selectedCategoryId }?.categoryName
+            ?: if (selectedCategoryId.isBlank()) "Todas" else "Categoría"
+    }
+    val currentChannel = activeChannels.getOrNull(index) ?: allChannels.getOrNull(index)
+
+    fun persistWatching(ch: LiveChannel) {
+        val cat = ch.categoryId.orEmpty()
+        prefs.edit()
+            .putString(KEY_CHANNEL, ch.id)
+            .putString(KEY_CATEGORY, cat)
+            .apply()
+    }
+
+    fun revealBanner() {
+        showBanner = true
+        bannerTick++
+    }
+
+    fun playChannel(ch: LiveChannel, instant: Boolean) {
+        persistWatching(ch)
+        val remote = XtreamClient.liveUrl(ch.id)
+        val toPlay = StreamBridge.maybeWrap(remote)
+        revealBanner()
+        if (instant) engine.playNow(toPlay) else engine.playZap(toPlay)
+    }
+
+    fun warmNeighbors(around: Int) {
+        val list = activeChannels
+        if (list.size < 2) return
+        val n = list.size
+        listOf(list[(around + 1) % n], list[(around - 1 + n) % n]).forEach { ch ->
+            StreamBridge.warm(XtreamClient.liveUrl(ch.id))
+        }
+    }
+
+    fun zap(delta: Int) {
+        val list = activeChannels
+        if (list.isEmpty()) return
+        index = (index + delta + list.size) % list.size
+        playChannel(list[index], instant = false)
+        warmNeighbors(index)
+    }
+
+    fun selectCategory(catId: String) {
+        selectedCategoryId = catId
+        showCategories = false
+        val list = if (catId.isBlank()) allChannels
+        else allChannels.filter { it.categoryId == catId }.ifEmpty { allChannels }
+        if (list.isEmpty()) {
+            prefs.edit().putString(KEY_CATEGORY, catId).apply()
+            return
+        }
+        val savedId = prefs.getString(KEY_CHANNEL, null).orEmpty()
+        val resumeIdx = list.indexOfFirst { it.id == savedId }.takeIf { it >= 0 } ?: 0
+        index = resumeIdx
+        playChannel(list[resumeIdx], instant = true)
+        if (catId.isBlank()) {
+            prefs.edit().putString(KEY_CATEGORY, "").apply()
+        }
+        warmNeighbors(resumeIdx)
+        runCatching { fullScreenFocus.requestFocus() }
+    }
+
+    // Auto-ocultar banner tras 3.5 segundos
+    LaunchedEffect(bannerTick) {
+        if (bannerTick == 0) return@LaunchedEffect
+        delay(3500)
+        showBanner = false
+    }
+
+    // Foco en pantalla completa cuando se expande
+    LaunchedEffect(fullScreen) {
+        if (fullScreen) {
+            delay(80)
+            runCatching { fullScreenFocus.requestFocus() }
+            revealBanner()
+        }
+    }
+
+    // Foco al abrir selector de categorías en pantalla completa
+    LaunchedEffect(showCategories) {
+        if (showCategories) {
+            delay(80)
+            runCatching { categoryFocus.requestFocus() }
+            val idx = categories.indexOfFirst { it.categoryId == selectedCategoryId }.coerceAtLeast(0)
+            if (categories.isNotEmpty()) {
+                runCatching { catListState.scrollToItem(idx) }
+            }
+        } else if (fullScreen) {
+            delay(40)
+            runCatching { fullScreenFocus.requestFocus() }
+        }
+    }
+
+    // Cargar canales y categorías de TV en vivo al iniciar
+    LaunchedEffect(Unit) {
+        var streams = Catalog.liveChannels
+        var cats = Catalog.liveCategories
+        if (streams.isEmpty()) {
+            streams = runCatching { XtreamClient.liveChannels() }.getOrDefault(emptyList())
+                .filter { it.id.isNotBlank() }
+        }
+        if (cats.isEmpty()) {
+            cats = runCatching { XtreamClient.liveCategories() }.getOrDefault(emptyList())
+                .filter { it.categoryId.isNotBlank() }
+        }
+        categories = buildList {
+            add(LiveCategory(categoryId = "", categoryName = "Todas"))
+            addAll(cats)
+        }
+        allChannels = streams
+
+        val savedChannelId = prefs.getString(KEY_CHANNEL, null).orEmpty()
+        val savedChannel = streams.firstOrNull { it.id == savedChannelId }
+
+        val catId = when {
+            savedChannel != null -> savedChannel.categoryId.orEmpty()
+            else -> {
+                val raw = prefs.getString(KEY_CATEGORY, null).orEmpty()
+                if (raw.isNotBlank() && cats.any { it.categoryId == raw }) raw else ""
+            }
+        }
+        selectedCategoryId = catId
+
+        val list = if (catId.isBlank()) streams else streams.filter { it.categoryId == catId }.ifEmpty { streams }
+        val playIdx = when {
+            savedChannelId.isNotBlank() -> list.indexOfFirst { it.id == savedChannelId }.takeIf { it >= 0 } ?: 0
+            else -> 0
+        }
+        val start = list.getOrNull(playIdx)
+        if (start != null) {
+            index = playIdx
+            playChannel(start, instant = true)
+            warmNeighbors(playIdx)
+        }
+    }
+
+    // Control de ciclo de vida del motor VLC
+    DisposableEffect(lifecycleOwner, engine) {
+        val obs = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    if (tab == Tab.HOME) engine.resume()
+                }
+                Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
+                    engine.pause()
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(obs)
+            engine.release()
+        }
+    }
+
+    // Pausar reproducción cuando no se está en HOME
+    LaunchedEffect(tab) {
+        if (tab == Tab.HOME) {
+            engine.resume()
+        } else {
+            engine.pause()
+        }
+    }
+
+    // Foco por defecto en TV en vivo
     var hubResumeTick by remember { mutableStateOf(0) }
     DisposableEffect(lifecycleOwner) {
         val obs = LifecycleEventObserver { _, event ->
@@ -106,6 +335,7 @@ fun HubScreen(onLogout: () -> Unit) {
     }
 
     fun openMovie(item: VodItem, resumeMs: Long = -1L) {
+        engine.pause()
         AppExit.openChildActivity {
             ctx.startActivity(
                 Intent(ctx, MovieActivity::class.java)
@@ -127,6 +357,7 @@ fun HubScreen(onLogout: () -> Unit) {
         resumeEpisodeId: String = "",
         resumeMs: Long = -1L
     ) {
+        engine.pause()
         AppExit.openChildActivity {
             ctx.startActivity(
                 Intent(ctx, SeriesActivity::class.java)
@@ -143,99 +374,299 @@ fun HubScreen(onLogout: () -> Unit) {
         }
     }
 
-    fun openLive() {
-        AppExit.openChildActivity {
-            ctx.startActivity(
-                Intent(ctx, LiveActivity::class.java)
-                    .putExtra(LiveActivity.EXTRA_USER, Session.username)
-                    .putExtra(LiveActivity.EXTRA_PASS, Session.password)
-                    .putExtra(LiveActivity.EXTRA_SERVER, Session.server)
-            )
+    // Atrás en pantalla completa: contrae sin reconexión al mini reproductor
+    BackHandler(enabled = fullScreen) {
+        if (showCategories) {
+            showCategories = false
+        } else {
+            fullScreen = false
         }
     }
 
     Box(Modifier.fillMaxSize()) {
         LoginBackdrop()
 
-        Box(Modifier.fillMaxSize()) {
-            when (tab) {
-                Tab.HOME -> HomePane(
-                    movies = movies2026,
-                    onMovie = { openMovie(it) }
-                )
-                Tab.SERIES -> Box(
-                    Modifier
-                        .padding(start = 88.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)
-                        .fillMaxSize()
-                ) {
-                    val shelves = Catalog.seriesShelves
-                    if (shelves.isEmpty()) {
-                        Text(
-                            "No hay series en el catálogo",
-                            color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 18.sp,
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    } else {
-                        CategoryBrowser(
-                            shelves = shelves,
-                            onPoster = { id -> series.find { it.id == id }?.let { openSeries(it) } }
-                        )
-                    }
+        // Un solo surface VLC: miniatura o pantalla completa (misma instancia, sin reconexión)
+        AndroidView(
+            factory = { c ->
+                VLCVideoLayout(c).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    keepScreenOn = true
+                    isFocusable = false
+                    isFocusableInTouchMode = false
+                    engine.attach(this)
                 }
-                Tab.MOVIES -> Box(
+            },
+            update = { engine.attach(it) },
+            modifier = if (fullScreen) {
+                Modifier
+                    .fillMaxSize()
+                    .zIndex(10f)
+            } else if (slotW > 0 && slotH > 0 && tab == Tab.HOME) {
+                Modifier
+                    .zIndex(3f)
+                    .offset { IntOffset(slotX, slotY) }
+                    .width(with(density) { slotW.toDp() })
+                    .height(with(density) { slotH.toDp() })
+                    .clip(RoundedCornerShape(12.dp))
+            } else {
+                Modifier
+                    .size(1.dp)
+                    .zIndex(0f)
+            }
+        )
+
+        // Overlay interactivo sobre la miniatura para recibir foco y click en TV Box
+        if (!fullScreen && slotW > 0 && slotH > 0 && tab == Tab.HOME) {
+            var miniFocused by remember { mutableStateOf(false) }
+            Box(
+                Modifier
+                    .zIndex(4f)
+                    .offset { IntOffset(slotX, slotY) }
+                    .width(with(density) { slotW.toDp() })
+                    .height(with(density) { slotH.toDp() })
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(
+                        BorderStroke(
+                            if (miniFocused) 3.dp else 1.dp,
+                            if (miniFocused) Color.White else Color.White.copy(alpha = 0.2f)
+                        ),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .tvFocus(shape = RoundedCornerShape(12.dp), focusedScale = 1.03f)
+                    .onFocusChanged { miniFocused = it.isFocused }
+                    .clickable { fullScreen = true }
+                    .focusable()
+            ) {
+                // Indicador "EN VIVO"
+                Row(
                     Modifier
-                        .padding(start = 88.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)
-                        .fillMaxSize()
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = 0.70f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val shelves = Catalog.movieShelves
-                    if (shelves.isEmpty()) {
-                        Text(
-                            "No hay películas en el catálogo",
-                            color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 18.sp,
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    } else {
-                        CategoryBrowser(
-                            shelves = shelves,
-                            onPoster = { id -> movies.find { it.id == id }?.let { openMovie(it) } }
-                        )
-                    }
+                    Box(
+                        Modifier
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(0xFFFF3D00))
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "EN VIVO",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
                 }
-                Tab.TV -> {}
+
+                if (currentChannel == null) {
+                    CircularProgressIndicator(
+                        color = Orange,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .align(Alignment.Center)
+                    )
+                }
             }
         }
 
-        Column(
-            Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 14.dp, top = 20.dp, bottom = 20.dp)
-                .fillMaxHeight(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                "N",
-                color = Orange,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Black,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            NavIcon(Icons.Filled.Home, tab == Tab.HOME) { tab = Tab.HOME }
-            NavIcon(
-                icon = Icons.Filled.LiveTv,
-                selected = tab == Tab.TV,
-                focusRequester = liveFocus
+        // Controles superpuestos en pantalla completa
+        if (fullScreen) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .zIndex(11f)
+                    .focusRequester(fullScreenFocus)
+                    .focusable()
+                    .onPreviewKeyEvent { e ->
+                        if (showCategories) return@onPreviewKeyEvent false
+                        if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        if (e.nativeKeyEvent.repeatCount > 0) return@onPreviewKeyEvent true
+                        when (e.nativeKeyEvent.keyCode) {
+                            AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+                            AndroidKeyEvent.KEYCODE_CHANNEL_DOWN,
+                            AndroidKeyEvent.KEYCODE_PAGE_DOWN -> {
+                                zap(1); true
+                            }
+                            AndroidKeyEvent.KEYCODE_DPAD_UP,
+                            AndroidKeyEvent.KEYCODE_CHANNEL_UP,
+                            AndroidKeyEvent.KEYCODE_PAGE_UP -> {
+                                zap(-1); true
+                            }
+                            AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+                            AndroidKeyEvent.KEYCODE_MENU,
+                            AndroidKeyEvent.KEYCODE_INFO -> {
+                                showCategories = true
+                                revealBanner()
+                                true
+                            }
+                            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                            AndroidKeyEvent.KEYCODE_ENTER -> {
+                                revealBanner(); true
+                            }
+                            AndroidKeyEvent.KEYCODE_BACK,
+                            AndroidKeyEvent.KEYCODE_ESCAPE -> {
+                                fullScreen = false; true
+                            }
+                            else -> false
+                        }
+                    }
             ) {
-                openLive()
+                if (showBanner && currentChannel != null && !showCategories) {
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = 24.dp)
+                    ) {
+                        ChannelSideBanner(
+                            number = index + 1,
+                            channel = currentChannel,
+                            categoryName = selectedCategoryName
+                        )
+                    }
+                }
+
+                if (showCategories) {
+                    Dialog(
+                        onDismissRequest = { showCategories = false },
+                        properties = DialogProperties(
+                            dismissOnBackPress = true,
+                            dismissOnClickOutside = false,
+                            usePlatformDefaultWidth = false,
+                            decorFitsSystemWindows = false
+                        )
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .clickable { showCategories = false },
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            CategorySidePanel(
+                                categories = categories,
+                                selectedCategoryId = selectedCategoryId,
+                                listState = catListState,
+                                firstFocus = categoryFocus,
+                                onSelect = { selectCategory(it) }
+                            )
+                        }
+                    }
+                }
             }
-            NavIcon(Icons.Filled.Tv, tab == Tab.SERIES) { tab = Tab.SERIES }
-            NavIcon(Icons.Filled.Movie, tab == Tab.MOVIES) { tab = Tab.MOVIES }
-            Spacer(Modifier.weight(1f))
-            NavIcon(Icons.Filled.Logout, false) {
-                Session.logout()
-                onLogout()
+        }
+
+        // Interfaz principal (visible cuando no está en pantalla completa)
+        if (!fullScreen) {
+            Box(Modifier.fillMaxSize()) {
+                when (tab) {
+                    Tab.HOME -> HomePane(
+                        movies = movies2026,
+                        currentChannel = currentChannel,
+                        channelNumber = if (activeChannels.isNotEmpty()) index + 1 else 0,
+                        categoryName = selectedCategoryName,
+                        onExpandLive = {
+                            fullScreen = true
+                        },
+                        onPositionSlot = { x, y, w, h ->
+                            slotX = x
+                            slotY = y
+                            slotW = w
+                            slotH = h
+                        },
+                        onMovie = { openMovie(it) }
+                    )
+                    Tab.SERIES -> Box(
+                        Modifier
+                            .padding(start = 88.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)
+                            .fillMaxSize()
+                    ) {
+                        val shelves = Catalog.seriesShelves
+                        if (shelves.isEmpty()) {
+                            Text(
+                                "No hay series en el catálogo",
+                                color = Color.White.copy(alpha = 0.75f),
+                                fontSize = 18.sp,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        } else {
+                            CategoryBrowser(
+                                shelves = shelves,
+                                onPoster = { id -> series.find { it.id == id }?.let { openSeries(it) } }
+                            )
+                        }
+                    }
+                    Tab.MOVIES -> Box(
+                        Modifier
+                            .padding(start = 88.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)
+                            .fillMaxSize()
+                    ) {
+                        val shelves = Catalog.movieShelves
+                        if (shelves.isEmpty()) {
+                            Text(
+                                "No hay películas en el catálogo",
+                                color = Color.White.copy(alpha = 0.75f),
+                                fontSize = 18.sp,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        } else {
+                            CategoryBrowser(
+                                shelves = shelves,
+                                onPoster = { id -> movies.find { it.id == id }?.let { openMovie(it) } }
+                            )
+                        }
+                    }
+                    Tab.TV -> {}
+                }
+            }
+
+            // Barra lateral de navegación
+            Column(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 14.dp, top = 20.dp, bottom = 20.dp)
+                    .fillMaxHeight(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "N",
+                    color = Orange,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                NavIcon(Icons.Filled.Home, tab == Tab.HOME) {
+                    tab = Tab.HOME
+                }
+                NavIcon(
+                    icon = Icons.Filled.LiveTv,
+                    selected = false,
+                    focusRequester = liveFocus
+                ) {
+                    tab = Tab.HOME
+                    fullScreen = true
+                }
+                NavIcon(Icons.Filled.Tv, tab == Tab.SERIES) {
+                    tab = Tab.SERIES
+                }
+                NavIcon(Icons.Filled.Movie, tab == Tab.MOVIES) {
+                    tab = Tab.MOVIES
+                }
+                Spacer(Modifier.weight(1f))
+                NavIcon(Icons.Filled.Logout, false) {
+                    engine.release()
+                    Session.logout()
+                    onLogout()
+                }
             }
         }
     }
@@ -278,64 +709,121 @@ private fun NavIcon(
 @Composable
 private fun HomePane(
     movies: List<VodItem>,
+    currentChannel: LiveChannel?,
+    channelNumber: Int,
+    categoryName: String,
+    onExpandLive: () -> Unit,
+    onPositionSlot: (x: Int, y: Int, w: Int, h: Int) -> Unit,
     onMovie: (VodItem) -> Unit
 ) {
-    var featured by remember(movies) { mutableStateOf(movies.firstOrNull()) }
-
     Column(
         Modifier
             .fillMaxSize()
             .padding(start = 88.dp, end = 20.dp, top = 26.dp, bottom = 14.dp)
     ) {
         Text("NEXO", color = Orange, fontSize = 32.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(16.dp))
 
-        featured?.let { movie ->
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
+        // Fila Hero: Mini reproductor de TV en vivo + información y botón de expandir
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Ranura (Slot) del mini reproductor 16:9
+            Box(
+                Modifier
+                    .width(360.dp)
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF141418))
+                    .onGloballyPositioned { coords ->
+                        val pos = coords.positionInRoot()
+                        onPositionSlot(
+                            pos.x.roundToInt(),
+                            pos.y.roundToInt(),
+                            coords.size.width,
+                            coords.size.height
+                        )
+                    }
+            )
+
+            Spacer(Modifier.width(24.dp))
+
+            // Información del canal y botón TV en vivo
+            Column(Modifier.weight(1f)) {
+                if (categoryName.isNotBlank()) {
                     Text(
-                        text = movie.displayName,
-                        color = Color.White,
-                        fontSize = 28.sp,
+                        text = categoryName.uppercase(),
+                        color = Orange,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 2,
+                        letterSpacing = 1.sp,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(14.dp))
-                    Row(
-                        Modifier
-                            .tvFocus(shape = RoundedCornerShape(12.dp), focusedScale = 1.04f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Orange)
-                            .clickable { onMovie(movie) }
-                            .focusable()
-                            .padding(horizontal = 22.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Filled.PlayArrow, null, tint = Color.White, modifier = Modifier.size(26.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Reproducir", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                    }
+                    Spacer(Modifier.height(4.dp))
                 }
-                Spacer(Modifier.width(22.dp))
-                Poster(
-                    url = movie.streamIcon,
-                    title = movie.displayName,
-                    modifier = Modifier
-                        .width(PosterW)
-                        .height(PosterH)
-                        .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
-                        .clickable { onMovie(movie) }
-                        .focusable()
+                Text(
+                    text = currentChannel?.name ?: "Cargando TV en vivo…",
+                    color = Color.White,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
+                if (channelNumber > 0) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Canal %03d".format(channelNumber),
+                        color = Color.White.copy(alpha = 0.65f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                var btnFocused by remember { mutableStateOf(false) }
+                Row(
+                    Modifier
+                        .onFocusChanged { btnFocused = it.isFocused }
+                        .tvFocus(shape = RoundedCornerShape(12.dp), focusedScale = 1.05f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (btnFocused) Color.White else Orange)
+                        .border(
+                            BorderStroke(
+                                if (btnFocused) 2.dp else 0.dp,
+                                if (btnFocused) Color.White else Color.Transparent
+                            ),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable { onExpandLive() }
+                        .focusable()
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Filled.Tv,
+                        contentDescription = null,
+                        tint = if (btnFocused) Color.Black else Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "TV en vivo",
+                        color = if (btnFocused) Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
+                    )
+                }
             }
         }
 
-        Spacer(Modifier.weight(1f))
-        Text("Películas 2026", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(20.dp))
+        Text(
+            "Películas 2026",
+            color = Color.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold
+        )
         Spacer(Modifier.height(8.dp))
         if (movies.isEmpty()) {
             Text(
@@ -357,7 +845,6 @@ private fun HomePane(
                             .width(PosterW)
                             .height(PosterH)
                             .tvFocus(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
-                            .onFocusChanged { if (it.isFocused) featured = m }
                             .clickable { onMovie(m) }
                             .focusable()
                     )
@@ -388,7 +875,12 @@ private fun CategoryBrowser(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Volver · ${open.name}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    "Volver · ${open.name}",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
             }
             PosterGrid(
                 items = open.posters.map { it.id to (it.cover to it.title) },
@@ -440,7 +932,6 @@ private fun CategoryShelfRow(
             modifier = Modifier.padding(start = 8.dp, bottom = 8.dp, end = 8.dp)
         )
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            // 7 carátulas visibles + la 8.ª apenas asomada hasta que llega el foco.
             val gap = 8.dp
             val visibleSlots = 7.28f
             val posterW = (maxWidth - gap * 7) / visibleSlots

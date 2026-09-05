@@ -442,7 +442,7 @@ class LiveActivity : ComponentActivity() {
 }
 
 @Composable
-private fun CategorySidePanel(
+internal fun CategorySidePanel(
     categories: List<LiveCategory>,
     selectedCategoryId: String,
     listState: androidx.compose.foundation.lazy.LazyListState,
@@ -528,7 +528,7 @@ private fun CategorySidePanel(
 }
 
 @Composable
-private fun ChannelSideBanner(
+internal fun ChannelSideBanner(
     number: Int,
     channel: LiveChannel,
     categoryName: String

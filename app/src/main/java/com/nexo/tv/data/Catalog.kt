@@ -25,6 +25,10 @@ object Catalog {
         private set
     @Volatile var seriesCategories: List<LiveCategory> = emptyList()
         private set
+    @Volatile var liveChannels: List<LiveChannel> = emptyList()
+        private set
+    @Volatile var liveCategories: List<LiveCategory> = emptyList()
+        private set
     @Volatile var ready: Boolean = false
         private set
 
@@ -49,15 +53,20 @@ object Catalog {
         val seriesJob = async { runCatching { XtreamClient.series() }.getOrDefault(emptyList()) }
         val movieCatsJob = async { runCatching { XtreamClient.vodCategories() }.getOrDefault(emptyList()) }
         val seriesCatsJob = async { runCatching { XtreamClient.seriesCategories() }.getOrDefault(emptyList()) }
+        val liveJob = async { runCatching { XtreamClient.liveChannels() }.getOrDefault(emptyList()) }
+        val liveCatsJob = async { runCatching { XtreamClient.liveCategories() }.getOrDefault(emptyList()) }
         movies = moviesJob.await()
         series = seriesJob.await()
         movieCategories = movieCatsJob.await()
         seriesCategories = seriesCatsJob.await()
+        liveChannels = liveJob.await().filter { it.id.isNotBlank() }
+        liveCategories = liveCatsJob.await().filter { it.categoryId.isNotBlank() }
         ready = true
         android.util.Log.i(
             "Catalog",
             "ready movies=${movies.size} series=${series.size} " +
-                "movieCats=${movieCategories.size} seriesCats=${seriesCategories.size}"
+                "movieCats=${movieCategories.size} seriesCats=${seriesCategories.size} " +
+                "liveChannels=${liveChannels.size} liveCats=${liveCategories.size}"
         )
     }
 
@@ -66,6 +75,8 @@ object Catalog {
         series = emptyList()
         movieCategories = emptyList()
         seriesCategories = emptyList()
+        liveChannels = emptyList()
+        liveCategories = emptyList()
         ready = false
     }
 
